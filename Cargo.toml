@@ -1,0 +1,6 @@
+[package]
+name = "node-api-sys"
+version = "0.1.0"
+authors = ["Jupp Müller <jupp0r@gmail.com>"]
+
+[dependencies]
