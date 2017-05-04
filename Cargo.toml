@@ -3,4 +3,8 @@ name = "node-api-sys"
 version = "0.1.0"
 authors = ["Jupp Müller <jupp0r@gmail.com>"]
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
+libc = "0.2.22"
