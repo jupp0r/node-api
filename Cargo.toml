@@ -1,5 +1,5 @@
 [package]
-name = "node-api-sys"
+name = "node-api"
 version = "0.1.0"
 authors = ["Jupp Müller <jupp0r@gmail.com>"]
 
@@ -8,3 +8,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2.22"
+node-api-sys = { path = "../node-api-sys" }
