@@ -4,7 +4,7 @@ use std::ffi::{CStr, CString, NulError};
 
 use node_api_sys::*;
 
-use napi_args;
+use napi_args::FromNapiArgs;
 
 pub type NapiValue = napi_value;
 pub type NapiEnv = napi_env;
@@ -83,7 +83,8 @@ fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
     }
 }
 
-fn get_last_error_info(env: napi_env) -> std::result::Result<napi_extended_error_info, napi_status> {
+fn get_last_error_info(env: napi_env)
+                       -> std::result::Result<napi_extended_error_info, napi_status> {
     unsafe {
         let mut info: *const napi_extended_error_info =
             Box::into_raw(Box::new(std::mem::uninitialized()));
@@ -216,23 +217,41 @@ pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
 //                                 data: *mut ::std::os::raw::c_void,
 //                                 result: *mut napi_value) -> napi_status;
 
-pub fn create_function<F, T: napi_args::FromNapiArgs>(env: NapiEnv, utf8name: &str, f: F) -> Result<NapiValue> where F: Fn(NapiEnv, T) {
+pub fn create_function<F, T: FromNapiArgs>(env: NapiEnv, utf8name: &str, f: F) -> Result<NapiValue>
+    where F: Fn(NapiEnv, T),
+          T: FromNapiArgs
+{
     let user_data = &f as *const _ as *mut std::os::raw::c_void;
-    unsafe extern fn wrapper<F, T>(env: NapiEnv, info: napi_callback_info) -> NapiValue where F: Fn(NapiEnv, T) {
-        let opt_closure = info as *mut Option<F>;
-        let mut callback_arguments = std::mem::uninitialized::<T>();
-            //     pub fn napi_get_cb_info(env: napi_env, cbinfo: napi_callback_info,
-            //                             argc: *mut usize, argv: *mut napi_value,
-            //                             this_arg: *mut napi_value,
-            //                             data: *mut *mut ::std::os::raw::c_void)
+    unsafe extern "C" fn wrapper<F, T>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
+        where F: Fn(NapiEnv, T),
+              T: FromNapiArgs
+    {
+        let mut argc: usize = 16;
+        let mut argv: [NapiValue; 16] = std::mem::uninitialized();
+        let mut callback: Option<F> = None;
 
- //           let status = napi_
-        //           (*opt_closure).take().unwrap()(env);
+        napi_get_cb_info(env,
+                         cbinfo,
+                         &mut argc,
+                         argv.as_mut_ptr(),
+                         std::ptr::null_mut(),
+                         &mut std::mem::transmute::<&mut Option<F>,
+                                                    *mut ::std::os::raw::c_void>(&mut callback));
+
+        let args = T::from_napi_args(&argv[0..argc]).unwrap();
+        match callback {
+            Some(cb) => cb(env, args),
+            None => ()
+        }
         get_undefined(env).unwrap()
     }
     unsafe {
         let mut napi_val: NapiValue = std::mem::uninitialized();
-        let status = napi_create_function(env, CString::new(utf8name).unwrap().into_raw(), Some(wrapper::<F, T>), user_data, &mut napi_val);
+        let status = napi_create_function(env,
+                                          CString::new(utf8name).unwrap().into_raw(),
+                                          Some(wrapper::<F, T>),
+                                          user_data,
+                                          &mut napi_val);
         napi_either(env, status, napi_val)
     }
 }
