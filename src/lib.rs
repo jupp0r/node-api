@@ -9,7 +9,7 @@ use std::io::Write;
 
 use node_api_sys::{napi_set_named_property, napi_status, napi_has_named_property};
 mod napi;
-mod napi_args;
+mod napi_value;
 
 pub use napi::{NapiValue, NapiError, NapiEnv};
 pub use napi::{get_null, get_undefined, get_global, get_boolean, create_object, create_array,
@@ -20,7 +20,7 @@ use napi::{module_register, NapiModule};
 const NAPI_MODULE_VERSION: libc::c_int = 1;
 
 struct HelloArgs {}
-impl napi_args::FromNapiArgs for HelloArgs {
+impl napi_value::FromNapiValues for HelloArgs {
     fn from_napi_args(_: NapiEnv, _: &[napi::NapiValue]) -> Result<Self, NapiError> {
         Ok(HelloArgs {})
     }
