@@ -1,0 +1,12 @@
+[package]
+name = "tests"
+version = "0.1.0"
+authors = ["Jupp Müller <jupp0r@gmail.com>"]
+license = "MIT"
+
+[lib]
+name = "tests"
+crate-type = ["cdylib"]
+
+[dependencies]
+node-api = {path = ".."}

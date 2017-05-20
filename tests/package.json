@@ -1,0 +1,16 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "description": "tests for the nodi-api crate",
+  "main": "index.js",
+  "repository": "https://github.com/jupp0r/node-api",
+  "author": "Jupp Müller <jupp0r@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "chai": "^3.5.0",
+    "mocha": "jupp0r/mocha#feature/enable-napi-modules"
+  },
+  "scripts": {
+    "test": "cargo build && npm install && mkdir -p node-api && (cp target/debug/libtests.dylib node-api/index.node || cp target/debug/libtests.so node-api/index.node || cp target/debug/libtests.dll node-api/index.node) && mocha --napi-modules index.js"
+  }
+}
