@@ -23,14 +23,35 @@ impl napi_value::FromNapiValues for HelloArgs {
     }
 }
 
+struct HelloReturn {
+    pub foo: String,
+    pub bar: u64,
+}
+impl napi_value::ToNapiValue for HelloReturn {
+    fn to_napi_value(&self, env: NapiEnv) -> napi::Result<NapiValue> {
+        let object = napi::create_object(env)?;
+        let foo = self.foo.to_napi_value(env)?;
+        let bar = self.bar.to_napi_value(env)?;
+        napi::set_named_property(env, object, "foo", foo)?;
+        napi::set_named_property(env, object, "bar", bar)?;
+        Ok(object)
+    }
+}
+
+
 #[no_mangle]
 pub extern "C" fn register(env: NapiEnv,
                            exports: NapiValue,
                            _module: NapiValue,
                            _priv: *mut c_void) {
-    napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| "world")
-        .and_then(|function| napi::set_named_property(env, exports, "hello", function))
-        .unwrap()
+    let function = napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| {
+        HelloReturn {
+            foo: "hello".to_string(),
+            bar: 42,
+        }
+    })
+            .expect("error creating function");
+    napi::set_named_property(env, exports, "hello", function).expect("error attaching function");
 }
 
 #[cfg_attr(target_os = "macos", link_args = "-Wl,-undefined,dynamic_lookup")]
