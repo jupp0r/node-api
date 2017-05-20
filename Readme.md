@@ -1,4 +1,4 @@
-# Node-API
+# Node-API [![Build Status](https://travis-ci.org/jupp0r/node-api.svg?branch=master)](https://travis-ci.org/jupp0r/node-api)
 
 Using this crate, you'll be easily able to write native node modules in Rust!
 
