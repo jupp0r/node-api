@@ -1,6 +1,6 @@
 use std;
 use std::boxed::Box;
-use std::ffi::{CStr, CString, NulError};
+use std::ffi::{CStr, CString};
 use node_api_sys::*;
 
 use napi_value::{FromNapiValues, ToNapiValue};
@@ -36,6 +36,12 @@ impl From<napi_extended_error_info> for NapiError {
                 error_code: NapiErrorType::from(error.error_code),
             }
         }
+    }
+}
+
+impl From<std::ffi::NulError> for NapiError {
+    fn from(_: std::ffi::NulError) -> Self {
+        make_generic_napi_error("string must not contain 0 byte")
     }
 }
 
@@ -75,6 +81,14 @@ impl From<napi_status> for NapiErrorType {
     }
 }
 
+fn make_generic_napi_error(message: &str) -> NapiError {
+    NapiError {
+        error_message: message.to_string(),
+        engine_error_code: 0,
+        error_code: NapiErrorType::GenericFailure,
+    }
+}
+
 fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
     match status {
         napi_status::napi_ok => Ok(val),
@@ -101,12 +115,12 @@ fn get_last_napi_error(env: NapiEnv) -> std::result::Result<NapiError, NapiError
         .map_err(|err| NapiErrorType::from(err))
 }
 
-pub fn module_register(mod_: NapiModule) -> std::result::Result<(), NulError> {
+pub fn module_register(mod_: NapiModule) -> std::result::Result<(), NapiError> {
     let module = &mut napi_module {
                           nm_version: mod_.version,
                           nm_flags: mod_.flags,
                           nm_filename: CString::new(mod_.filename)?.as_ptr(),
-                          nm_register_func: Some(mod_.register_func.unwrap()),
+                          nm_register_func: mod_.register_func,
                           nm_modname: try!(CString::new(mod_.modname)).as_ptr(),
                           nm_priv: std::ptr::null_mut(),
                           reserved: [std::ptr::null_mut(),
@@ -202,14 +216,15 @@ pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
 pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
     where T: AsRef<str>
 {
-    unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
-        let status = napi_create_string_utf8(env,
-                                             val.as_ref().as_ptr() as *const i8,
-                                             val.as_ref().len(),
-                                             &mut napi_val);
-        napi_either(env, status, napi_val)
-    }
+    let mut napi_val: NapiValue = 0;
+    let converted_value = CString::new(val.as_ref())?;
+    let status = unsafe {
+        napi_create_string_utf8(env,
+                                converted_value.as_ptr(),
+                                std::usize::MAX, // indicates 0-terminated string
+                                &mut napi_val)
+    };
+    napi_either(env, status, napi_val)
 }
 
 //     pub fn napi_create_string_utf16(env: napi_env, str: *const char16_t,
@@ -265,9 +280,10 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
     let boxed_f = Box::new(Some(f));
     let user_data = Box::into_raw(boxed_f) as *mut std::os::raw::c_void;
     let mut napi_val: NapiValue = 0;
+    let name = CString::new(utf8name)?;
     let status = unsafe {
         napi_create_function(env,
-                             CString::new(utf8name).unwrap().into_raw(),
+                             name.into_raw(),
                              Some(wrapper::<F, T, R>),
                              user_data,
                              &mut napi_val)
@@ -378,9 +394,8 @@ pub fn set_named_property(env: NapiEnv,
                           name: &str,
                           value: NapiValue)
                           -> Result<()> {
-    let status = unsafe {
-        napi_set_named_property(env, target, CString::new(name).unwrap().as_ptr(), value)
-    };
+    let status =
+        unsafe { napi_set_named_property(env, target, CString::new(name)?.as_ptr(), value) };
     napi_either(env, status, ())
 }
 
