@@ -397,7 +397,8 @@ pub fn set_named_property(env: NapiEnv,
 //     pub fn napi_set_element(env: napi_env, object: napi_value, index: u32,
 //                             value: napi_value) -> napi_status;
 pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValue) -> Result<()> {
-    Ok(())
+    let status = unsafe { napi_set_element(env, array, index as u32, value) };
+    napi_either(env, status, ())
 }
 
 //     pub fn napi_has_element(env: napi_env, object: napi_value, index: u32,
