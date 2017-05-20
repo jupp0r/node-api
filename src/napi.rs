@@ -198,21 +198,6 @@ pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
     }
 }
 
-
-//     pub fn napi_create_number(env: napi_env, value: f64,
-//                               result: *mut napi_value) -> napi_status;
-
-
-//     pub fn napi_create_string_latin1(env: napi_env,
-//                                      str: *const ::std::os::raw::c_char,
-//                                      length: usize, result: *mut napi_value)
-//      -> napi_status;
-
-
-//     pub fn napi_create_string_utf8(env: napi_env,
-//                                    str: *const ::std::os::raw::c_char,
-//                                    length: usize, result: *mut napi_value)
-//      -> napi_status;
 pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
     where T: AsRef<str>
 {
@@ -227,20 +212,8 @@ pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
     napi_either(env, status, napi_val)
 }
 
-//     pub fn napi_create_string_utf16(env: napi_env, str: *const char16_t,
-//                                     length: usize, result: *mut napi_value)
-//      -> napi_status;
-
-
 //     pub fn napi_create_symbol(env: napi_env, description: napi_value,
 //                               result: *mut napi_value) -> napi_status;
-
-
-//     pub fn napi_create_function(env: napi_env,
-//                                 utf8name: *const ::std::os::raw::c_char,
-//                                 cb: napi_callback,
-//                                 data: *mut ::std::os::raw::c_void,
-//                                 result: *mut napi_value) -> napi_status;
 
 pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<NapiValue>
     where F: Fn(NapiEnv, T) -> R,
@@ -409,8 +382,6 @@ pub fn set_named_property(env: NapiEnv,
 //                                    result: *mut napi_value) -> napi_status;
 
 
-//     pub fn napi_set_element(env: napi_env, object: napi_value, index: u32,
-//                             value: napi_value) -> napi_status;
 pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValue) -> Result<()> {
     let status = unsafe { napi_set_element(env, array, index as u32, value) };
     napi_either(env, status, ())
