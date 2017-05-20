@@ -7,46 +7,33 @@ use std::ffi::CString;
 use std::os::raw::c_void;
 use std::io::Write;
 
-use node_api_sys::{napi_env, napi_value, napi_create_function, napi_set_named_property,
-                   napi_callback_info, napi_status, napi_create_string_utf8,
-                   napi_has_named_property};
+use node_api_sys::{napi_set_named_property, napi_status, napi_has_named_property};
 mod napi;
 mod napi_args;
+
+pub use napi::{NapiValue, NapiError, NapiEnv};
+pub use napi::{get_null, get_undefined, get_global, get_boolean, create_object, create_array,
+               array_with_length, create_number};
 
 use napi::{module_register, NapiModule};
 
 const NAPI_MODULE_VERSION: libc::c_int = 1;
 
-#[no_mangle]
-pub extern "C" fn hello(env: napi_env, _info: napi_callback_info) -> napi_value {
-    unsafe {
-        let mut w: napi_value = std::mem::uninitialized();
-        let _status = napi_create_string_utf8(env,
-                                              CString::new("World").unwrap().as_ptr(),
-                                              (1 as libc::size_t).wrapping_neg(),
-                                              &mut w as *mut _);
-        println!("called hello");
-        w
-    }
-}
-
 struct HelloArgs {}
 impl napi_args::FromNapiArgs for HelloArgs {
-    fn from_napi_args(_: &[napi::NapiValue]) -> Option<Self> {
-        Some(HelloArgs {})
+    fn from_napi_args(_: NapiEnv, _: &[napi::NapiValue]) -> Result<Self, NapiError> {
+        Ok(HelloArgs {})
     }
 }
 
 #[no_mangle]
-pub extern "C" fn register(env: napi_env,
-                           exports: napi_value,
-                           _module: napi_value,
+pub extern "C" fn register(env: NapiEnv,
+                           exports: NapiValue,
+                           _module: NapiValue,
                            _priv: *mut c_void) {
     std::io::stderr().write(b"register\n");
-   let mut function = napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| {
-            std::io::stderr().write(b"hello\n");
-    })
-            .unwrap();
+    let function = napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| "world")
+        .unwrap();
     unsafe {
         let status = napi_set_named_property(env,
                                              exports,

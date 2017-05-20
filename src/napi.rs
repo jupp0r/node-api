@@ -6,7 +6,7 @@ use std::string::ToString;
 
 use node_api_sys::*;
 
-use napi_args::FromNapiArgs;
+use napi_args::{FromNapiArgs, ToNapiArgs};
 
 pub type NapiValue = napi_value;
 pub type NapiEnv = napi_env;
@@ -81,7 +81,7 @@ impl From<napi_status> for NapiErrorType {
 fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
     match status {
         napi_status::napi_ok => Ok(val),
-        err => Err(get_last_napi_error(env).expect("error fetching last napi error")),
+        _err => Err(get_last_napi_error(env).expect("error fetching last napi error")),
     }
 }
 
@@ -203,7 +203,13 @@ pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
 //                                    str: *const ::std::os::raw::c_char,
 //                                    length: usize, result: *mut napi_value)
 //      -> napi_status;
-
+pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue> where T: AsRef<str> {
+    unsafe {
+        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let status = napi_create_string_utf8(env, val.as_ref().as_ptr() as *const i8, val.as_ref().len(), &mut napi_val);
+        napi_either(env, status, napi_val)
+    }
+}
 
 //     pub fn napi_create_string_utf16(env: napi_env, str: *const char16_t,
 //                                     length: usize, result: *mut napi_value)
@@ -220,17 +226,19 @@ pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
 //                                 data: *mut ::std::os::raw::c_void,
 //                                 result: *mut napi_value) -> napi_status;
 
-pub fn create_function<F, T: FromNapiArgs>(env: NapiEnv,
+pub fn create_function<F, T, R>(env: NapiEnv,
                                            utf8name: &str,
-                                           mut f: F)
+                                           f: F)
                                            -> Result<NapiValue>
-    where F: Fn(NapiEnv, T),
-          T: FromNapiArgs
+    where F: Fn(NapiEnv, T) -> R,
+          T: FromNapiArgs,
+          R: ToNapiArgs
 {
     std::io::stderr().write(b"create function\n");
-    unsafe extern "C" fn wrapper<F, T>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
-        where F: Fn(NapiEnv, T),
-              T: FromNapiArgs
+    unsafe extern "C" fn wrapper<F, T, R>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
+        where F: Fn(NapiEnv, T) -> R,
+    T: FromNapiArgs,
+    R: ToNapiArgs
     {
         std::io::stderr().write(b"wrapper\n");
 
@@ -247,14 +255,14 @@ pub fn create_function<F, T: FromNapiArgs>(env: NapiEnv,
         assert!(user_data != std::ptr::null_mut());
 
         let args = match argc {
-            0 => T::from_napi_args(&[]).expect("cannot convert arguments"),
-            _ => T::from_napi_args(&argv[0..(argc - 1)]).expect("cannot convert arguments"),
+            0 => T::from_napi_args(env, &[]).expect("cannot convert arguments"),
+            _ => T::from_napi_args(env, &argv[0..(argc - 1)]).expect("cannot convert arguments"),
         };
 
-        let mut callback: Box<Option<F>> = Box::from_raw(user_data as *mut Option<F>);
+        let callback: Box<Option<F>> = Box::from_raw(user_data as *mut Option<F>);
 
-        callback.expect("no callback found")(env, args);
-        get_undefined(env).unwrap()
+        let return_value = callback.expect("no callback found")(env, args);
+        return_value.to_napi_args(env).unwrap_or(get_undefined(env).unwrap())
     }
     unsafe {
         let boxed_f = Box::new(Some(f));
@@ -266,7 +274,7 @@ pub fn create_function<F, T: FromNapiArgs>(env: NapiEnv,
         let mut napi_val: NapiValue = std::mem::uninitialized();
         let status = napi_create_function(env,
                                           CString::new(utf8name).unwrap().into_raw(),
-                                          Some(wrapper::<F, T>),
+                                          Some(wrapper::<F, T, R>),
                                           user_data,
                                           &mut napi_val);
         std::io::stderr().write(("napi create function user_data=0x".to_string() +
@@ -325,6 +333,8 @@ pub fn create_function<F, T: FromNapiArgs>(env: NapiEnv,
 //                                       buf: *mut ::std::os::raw::c_char,
 //                                       bufsize: usize, result: *mut usize)
 //      -> napi_status;
+// pub fn get_value_string_utf8(env: NapiEnv, va)
+
 
 
 //     pub fn napi_get_value_string_utf16(env: napi_env, value: napi_value,
