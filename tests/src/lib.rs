@@ -4,7 +4,7 @@ extern crate node_api;
 
 napi_module!("tests", register);
 
-use node_api::{NapiEnv, NapiValue, ToNapiValue};
+use node_api::{NapiEnv, NapiValue, FromNapiValues, ToNapiValue};
 use node_api::{create_function, set_named_property, create_object};
 
 #[no_mangle]
@@ -12,12 +12,19 @@ pub extern "C" fn register(env: NapiEnv,
                            exports: NapiValue,
                            _module: NapiValue,
                            _priv: *mut std::os::raw::c_void) {
-    let returns_objects_test =
-        create_function(env, "returns_objects", &returns_objects).expect("error creating function");
-    set_named_property(env, exports, "returns_objects", returns_objects_test).expect("error attaching function");
-    let returns_strings_test =
-        create_function(env, "returns_strings", &returns_strings).expect("error creating function");
-    set_named_property(env, exports, "returns_strings", returns_strings_test).expect("error attaching function");
+    register_test(env, "returns_objects", exports, &returns_objects);
+    register_test(env, "returns_strings", exports, &returns_strings);
+    register_test(env, "returns_numbers", exports, &returns_numbers);
+    register_test(env, "returns_booleans", exports, &returns_booleans);
+}
+
+fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
+    where F: Fn(NapiEnv, A) -> R,
+          A: FromNapiValues,
+          R: ToNapiValue
+{
+    let test = create_function(env, name, f).unwrap();
+    set_named_property(env, exports, name, test).unwrap();
 }
 
 // returns objects
@@ -46,4 +53,14 @@ impl ToNapiValue for ReturnsObjectsReturn {
 // returns strings
 fn returns_strings(_: NapiEnv, _: ()) -> String {
     "returned_string".to_string()
+}
+
+// returns numbers
+fn returns_numbers(_: NapiEnv, _: ()) -> u64 {
+    42
+}
+
+// returns booleans
+fn returns_booleans(_: NapiEnv, _: ()) -> bool {
+    true
 }

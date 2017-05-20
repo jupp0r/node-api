@@ -8,4 +8,10 @@ describe("node-api", function() {
     it("can return strings", function() {
         expect(nt.returns_strings()).to.equal("returned_string");
     });
+    it("can return numbers", function() {
+        expect(nt.returns_numbers()).to.equal(42);
+    });
+    it("can return booleans", function() {
+        expect(nt.returns_booleans()).to.equal(true);
+    });
 });
