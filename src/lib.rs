@@ -32,23 +32,9 @@ pub extern "C" fn register(env: NapiEnv,
                            _module: NapiValue,
                            _priv: *mut c_void) {
     std::io::stderr().write(b"register\n");
-    let function = napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| "world")
-        .unwrap();
-    unsafe {
-        let status = napi_set_named_property(env,
-                                             exports,
-                                             CString::new("hello").unwrap().as_ptr(),
-                                             function);
-        assert!(status == napi_status::napi_ok);
-        let mut present: bool = false;
-        let status2 = napi_has_named_property(env,
-                                              exports,
-                                              CString::new("hello").unwrap().as_ptr(),
-                                              &mut present);
-        assert!(status2 == napi_status::napi_ok);
-        assert!(present);
-        println!("register");
-    }
+    napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| "world")
+        .and_then(|function| napi::set_named_property(env, exports, "hello", function))
+        .unwrap()
 }
 
 #[cfg_attr(target_os = "macos", link_args = "-Wl,-undefined,dynamic_lookup")]

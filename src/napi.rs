@@ -388,7 +388,17 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
 //     pub fn napi_set_named_property(env: napi_env, object: napi_value,
 //                                    utf8name: *const ::std::os::raw::c_char,
 //                                    value: napi_value) -> napi_status;
-
+pub fn set_named_property(env: NapiEnv,
+                          object: NapiValue,
+                          name: &str,
+                          value: NapiValue)
+                          -> Result<()> {
+    unsafe {
+        let status =
+            napi_set_named_property(env, object, CString::new(name).unwrap().as_ptr(), value);
+        napi_either(env, status, ())
+    }
+}
 
 //     pub fn napi_has_named_property(env: napi_env, object: napi_value,
 //                                    utf8name: *const ::std::os::raw::c_char,
