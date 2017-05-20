@@ -261,17 +261,18 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
             .to_napi_value(env)
             .unwrap_or(get_undefined(env).unwrap())
     }
-    unsafe {
-        let boxed_f = Box::new(Some(f));
-        let user_data = Box::into_raw(boxed_f) as *mut std::os::raw::c_void;
-        let mut napi_val: NapiValue = std::mem::uninitialized();
-        let status = napi_create_function(env,
-                                          CString::new(utf8name).unwrap().into_raw(),
-                                          Some(wrapper::<F, T, R>),
-                                          user_data,
-                                          &mut napi_val);
-        napi_either(env, status, napi_val)
-    }
+
+    let boxed_f = Box::new(Some(f));
+    let user_data = Box::into_raw(boxed_f) as *mut std::os::raw::c_void;
+    let mut napi_val: NapiValue = 0;
+    let status = unsafe {
+        napi_create_function(env,
+                             CString::new(utf8name).unwrap().into_raw(),
+                             Some(wrapper::<F, T, R>),
+                             user_data,
+                             &mut napi_val)
+    };
+    napi_either(env, status, napi_val)
 }
 
 
@@ -373,15 +374,14 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
 //                                    utf8name: *const ::std::os::raw::c_char,
 //                                    value: napi_value) -> napi_status;
 pub fn set_named_property(env: NapiEnv,
-                          object: NapiValue,
+                          target: NapiValue,
                           name: &str,
                           value: NapiValue)
                           -> Result<()> {
-    unsafe {
-        let status =
-            napi_set_named_property(env, object, CString::new(name).unwrap().as_ptr(), value);
-        napi_either(env, status, ())
-    }
+    let status = unsafe {
+        napi_set_named_property(env, target, CString::new(name).unwrap().as_ptr(), value)
+    };
+    napi_either(env, status, ())
 }
 
 //     pub fn napi_has_named_property(env: napi_env, object: napi_value,

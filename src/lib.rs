@@ -4,7 +4,6 @@ extern crate libc;
 extern crate node_api_sys;
 
 use std::os::raw::c_void;
-use std::io::Write;
 
 mod napi;
 mod napi_value;
