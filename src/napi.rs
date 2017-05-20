@@ -238,8 +238,8 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
         assert!(user_data != std::ptr::null_mut());
 
         let args = match argc {
-            0 => T::from_napi_args(env, &[]).expect("cannot convert arguments"),
-            _ => T::from_napi_args(env, &argv[0..(argc - 1)]).expect("cannot convert arguments"),
+            0 => T::from_napi_values(env, &[]).expect("cannot convert arguments"),
+            _ => T::from_napi_values(env, &argv[0..(argc - 1)]).expect("cannot convert arguments"),
         };
 
         let callback: Box<Option<F>> = Box::from_raw(user_data as *mut Option<F>);

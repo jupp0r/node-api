@@ -4,7 +4,13 @@ use std::iter::Iterator;
 use napi::Result;
 
 pub trait FromNapiValues: Sized {
-    fn from_napi_args(napi::NapiEnv, &[napi::NapiValue]) -> Result<Self>;
+    fn from_napi_values(napi::NapiEnv, &[napi::NapiValue]) -> Result<Self>;
+}
+
+impl FromNapiValues for () {
+    fn from_napi_values(_: napi::NapiEnv, _: &[napi::NapiValue]) -> Result<Self> {
+        Ok(())
+    }
 }
 
 pub trait ToNapiValue {

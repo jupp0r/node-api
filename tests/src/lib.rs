@@ -4,7 +4,7 @@ extern crate node_api;
 
 napi_module!("tests", register);
 
-use node_api::{NapiEnv, NapiValue, FromNapiValues, ToNapiValue, NapiError};
+use node_api::{NapiEnv, NapiValue, ToNapiValue};
 use node_api::{create_function, set_named_property, create_object};
 
 #[no_mangle]
@@ -15,19 +15,16 @@ pub extern "C" fn register(env: NapiEnv,
     let returns_objects_test =
         create_function(env, "returns_objects", &returns_objects).expect("error creating function");
     set_named_property(env, exports, "returns_objects", returns_objects_test).expect("error attaching function");
+    let returns_strings_test =
+        create_function(env, "returns_strings", &returns_strings).expect("error creating function");
+    set_named_property(env, exports, "returns_strings", returns_strings_test).expect("error attaching function");
 }
 
-fn returns_objects(_: NapiEnv, _: ReturnsObjectsArgs) -> ReturnsObjectsReturn {
+// returns objects
+fn returns_objects(_: NapiEnv, _: ()) -> ReturnsObjectsReturn {
     ReturnsObjectsReturn {
         foo: "hello".to_string(),
         bar: 42,
-    }
-}
-
-struct ReturnsObjectsArgs {}
-impl FromNapiValues for ReturnsObjectsArgs {
-    fn from_napi_args(_: NapiEnv, _: &[NapiValue]) -> Result<Self, NapiError> {
-        Ok(ReturnsObjectsArgs {})
     }
 }
 
@@ -44,4 +41,9 @@ impl ToNapiValue for ReturnsObjectsReturn {
         set_named_property(env, object, "bar", bar)?;
         Ok(object)
     }
+}
+
+// returns strings
+fn returns_strings(_: NapiEnv, _: ()) -> String {
+    "returned_string".to_string()
 }
