@@ -1,10 +1,10 @@
 [package]
-name = "node-api"
+name = "hello-world"
 version = "0.1.0"
 authors = ["Jupp Müller <jupp0r@gmail.com>"]
 
 [lib]
-crate-type = ["lib"]
+crate-type = ["cdylib"]
 
 [dependencies]
-node-api-sys = { path = "../node-api-sys" }
+node-api = { path = "../.." }
