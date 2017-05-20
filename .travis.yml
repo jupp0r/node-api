@@ -6,22 +6,26 @@ matrix:
   include:
     - os: linux
       rust: nightly
+      node_js: head
     - os: osx
       osx_image: xcode8
       rust: nightly
+      node_js: head
 
 install: |
   if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-    apt-get install git curl g++ autotools
     git clone https://github.com/nodejs/node.git
-    cd node
+    pushd node
     ./configure
     make -j 4
+    sudo make install
+    popd
   elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    brew reinstall --HEAD nodejs
+    brew reinstall -v --HEAD nodejs
   fi
 
 
 script:
+  - nvm use system
   - cd tests
   - npm test

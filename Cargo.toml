@@ -7,4 +7,4 @@ authors = ["Jupp Müller <jupp0r@gmail.com>"]
 crate-type = ["lib"]
 
 [dependencies]
-node-api-sys = { path = "../node-api-sys" }
+node-api-sys = "0"
