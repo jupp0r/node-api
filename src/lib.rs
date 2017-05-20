@@ -3,11 +3,9 @@
 extern crate libc;
 extern crate node_api_sys;
 
-use std::ffi::CString;
 use std::os::raw::c_void;
 use std::io::Write;
 
-use node_api_sys::{napi_set_named_property, napi_status, napi_has_named_property};
 mod napi;
 mod napi_value;
 
@@ -31,7 +29,6 @@ pub extern "C" fn register(env: NapiEnv,
                            exports: NapiValue,
                            _module: NapiValue,
                            _priv: *mut c_void) {
-    std::io::stderr().write(b"register\n");
     napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| "world")
         .and_then(|function| napi::set_named_property(env, exports, "hello", function))
         .unwrap()
@@ -53,7 +50,6 @@ pub static REGISTER_FOO: extern "C" fn() = {
                             modname: "foo".to_string(),
                         })
                 .expect("error registering module");
-        std::io::stderr().write(b"load\n");
     }
     __load_napi_module
 };

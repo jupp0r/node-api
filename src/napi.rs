@@ -1,9 +1,6 @@
 use std;
 use std::boxed::Box;
 use std::ffi::{CStr, CString, NulError};
-use std::io::Write;
-use std::string::ToString;
-
 use node_api_sys::*;
 
 use napi_value::{FromNapiValues, ToNapiValue};
@@ -118,7 +115,6 @@ pub fn module_register(mod_: NapiModule) -> std::result::Result<(), NulError> {
                                      std::ptr::null_mut()],
                       };
     unsafe {
-        std::io::stderr().write(b"module_register\n");
         napi_module_register(module);
     }
     Ok(())
@@ -236,14 +232,11 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
           T: FromNapiValues,
           R: ToNapiValue
 {
-    std::io::stderr().write(b"create function\n");
     unsafe extern "C" fn wrapper<F, T, R>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
         where F: Fn(NapiEnv, T) -> R,
               T: FromNapiValues,
               R: ToNapiValue
     {
-        std::io::stderr().write(b"wrapper\n");
-
         let mut argc: usize = 16;
         let mut argv: [NapiValue; 16] = std::mem::uninitialized();
         let mut user_data = std::ptr::null_mut();
@@ -271,21 +264,12 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
     unsafe {
         let boxed_f = Box::new(Some(f));
         let user_data = Box::into_raw(boxed_f) as *mut std::os::raw::c_void;
-        std::io::stderr().write(("napi create function user_data=0x".to_string() +
-                                 (user_data as u64).to_string().as_str() +
-                                 "\n")
-                                        .as_bytes());
         let mut napi_val: NapiValue = std::mem::uninitialized();
         let status = napi_create_function(env,
                                           CString::new(utf8name).unwrap().into_raw(),
                                           Some(wrapper::<F, T, R>),
                                           user_data,
                                           &mut napi_val);
-        std::io::stderr().write(("napi create function user_data=0x".to_string() +
-                                 (user_data as u64).to_string().as_str() +
-                                 "\n")
-                                        .as_bytes());
-
         napi_either(env, status, napi_val)
     }
 }
