@@ -1,6 +1,8 @@
 use std;
 use std::boxed::Box;
 use std::ffi::{CStr, CString, NulError};
+use std::io::Write;
+use std::string::ToString;
 
 use node_api_sys::*;
 
@@ -116,6 +118,7 @@ pub fn module_register(mod_: NapiModule) -> std::result::Result<(), NulError> {
                                      std::ptr::null_mut()],
                       };
     unsafe {
+        std::io::stderr().write(b"module_register\n");
         napi_module_register(module);
     }
     Ok(())
@@ -217,41 +220,60 @@ pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
 //                                 data: *mut ::std::os::raw::c_void,
 //                                 result: *mut napi_value) -> napi_status;
 
-pub fn create_function<F, T: FromNapiArgs>(env: NapiEnv, utf8name: &str, f: F) -> Result<NapiValue>
+pub fn create_function<F, T: FromNapiArgs>(env: NapiEnv,
+                                           utf8name: &str,
+                                           mut f: F)
+                                           -> Result<NapiValue>
     where F: Fn(NapiEnv, T),
           T: FromNapiArgs
 {
-    let user_data = &f as *const _ as *mut std::os::raw::c_void;
+    std::io::stderr().write(b"create function\n");
     unsafe extern "C" fn wrapper<F, T>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
         where F: Fn(NapiEnv, T),
               T: FromNapiArgs
     {
+        std::io::stderr().write(b"wrapper\n");
+
         let mut argc: usize = 16;
         let mut argv: [NapiValue; 16] = std::mem::uninitialized();
-        let mut callback: Option<F> = None;
+        let mut user_data = std::ptr::null_mut();
+        let status = napi_get_cb_info(env,
+                                      cbinfo,
+                                      &mut argc,
+                                      argv.as_mut_ptr(),
+                                      std::ptr::null_mut(),
+                                      &mut user_data);
+        assert!(status == napi_status::napi_ok);
+        assert!(user_data != std::ptr::null_mut());
 
-        napi_get_cb_info(env,
-                         cbinfo,
-                         &mut argc,
-                         argv.as_mut_ptr(),
-                         std::ptr::null_mut(),
-                         &mut std::mem::transmute::<&mut Option<F>,
-                                                    *mut ::std::os::raw::c_void>(&mut callback));
+        let args = match argc {
+            0 => T::from_napi_args(&[]).expect("cannot convert arguments"),
+            _ => T::from_napi_args(&argv[0..(argc - 1)]).expect("cannot convert arguments"),
+        };
 
-        let args = T::from_napi_args(&argv[0..argc]).unwrap();
-        match callback {
-            Some(cb) => cb(env, args),
-            None => ()
-        }
+        let mut callback: Box<Option<F>> = Box::from_raw(user_data as *mut Option<F>);
+
+        callback.expect("no callback found")(env, args);
         get_undefined(env).unwrap()
     }
     unsafe {
+        let boxed_f = Box::new(Some(f));
+        let user_data = Box::into_raw(boxed_f) as *mut std::os::raw::c_void;
+        std::io::stderr().write(("napi create function user_data=0x".to_string() +
+                                 (user_data as u64).to_string().as_str() +
+                                 "\n")
+                                        .as_bytes());
         let mut napi_val: NapiValue = std::mem::uninitialized();
         let status = napi_create_function(env,
                                           CString::new(utf8name).unwrap().into_raw(),
                                           Some(wrapper::<F, T>),
                                           user_data,
                                           &mut napi_val);
+        std::io::stderr().write(("napi create function user_data=0x".to_string() +
+                                 (user_data as u64).to_string().as_str() +
+                                 "\n")
+                                        .as_bytes());
+
         napi_either(env, status, napi_val)
     }
 }

@@ -5,6 +5,8 @@ extern crate node_api_sys;
 
 use std::ffi::CString;
 use std::os::raw::c_void;
+use std::io::Write;
+
 use node_api_sys::{napi_env, napi_value, napi_create_function, napi_set_named_property,
                    napi_callback_info, napi_status, napi_create_string_utf8,
                    napi_has_named_property};
@@ -28,35 +30,42 @@ pub extern "C" fn hello(env: napi_env, _info: napi_callback_info) -> napi_value 
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn register(env: napi_env,
-                                  exports: napi_value,
-                                  _module: napi_value,
-                                  _priv: *mut c_void) {
+struct HelloArgs {}
+impl napi_args::FromNapiArgs for HelloArgs {
+    fn from_napi_args(_: &[napi::NapiValue]) -> Option<Self> {
+        Some(HelloArgs {})
+    }
+}
 
-    let mut function: napi_value = std::mem::uninitialized();
-    napi_create_function(env,
-                         std::ptr::null(),
-                         Some(hello),
-                         std::ptr::null_mut(),
-                         &mut function);
-    let status = napi_set_named_property(env,
-                                         exports,
-                                         CString::new("hello").unwrap().as_ptr(),
-                                         function);
-    assert!(status == napi_status::napi_ok);
-    let mut present: bool = false;
-    let status2 = napi_has_named_property(env,
-                                          exports,
-                                          CString::new("hello").unwrap().as_ptr(),
-                                          &mut present);
-    assert!(status2 == napi_status::napi_ok);
-    assert!(present);
-    println!("register");
+#[no_mangle]
+pub extern "C" fn register(env: napi_env,
+                           exports: napi_value,
+                           _module: napi_value,
+                           _priv: *mut c_void) {
+    std::io::stderr().write(b"register\n");
+   let mut function = napi::create_function(env, "foo", |_: napi::NapiEnv, _: HelloArgs| {
+            std::io::stderr().write(b"hello\n");
+    })
+            .unwrap();
+    unsafe {
+        let status = napi_set_named_property(env,
+                                             exports,
+                                             CString::new("hello").unwrap().as_ptr(),
+                                             function);
+        assert!(status == napi_status::napi_ok);
+        let mut present: bool = false;
+        let status2 = napi_has_named_property(env,
+                                              exports,
+                                              CString::new("hello").unwrap().as_ptr(),
+                                              &mut present);
+        assert!(status2 == napi_status::napi_ok);
+        assert!(present);
+        println!("register");
+    }
 }
 
 #[cfg_attr(target_os = "macos", link_args = "-Wl,-undefined,dynamic_lookup")]
-extern{}
+extern "C" {}
 
 #[cfg_attr(target_os = "linux", link_section = ".ctors")]
 #[cfg_attr(target_os = "macos", link_section = "__DATA,__mod_init_func")]
@@ -64,13 +73,14 @@ extern{}
 pub static REGISTER_FOO: extern "C" fn() = {
     extern "C" fn __load_napi_module() {
         module_register(NapiModule {
-            version: NAPI_MODULE_VERSION,
-            flags: 0,
-            filename: "foo".to_string(),
-            register_func: Some(register),
-            modname: "foo".to_string(),
-        }).expect("error registering module");
-        println!("load");
+                            version: NAPI_MODULE_VERSION,
+                            flags: 0,
+                            filename: "foo".to_string(),
+                            register_func: Some(register),
+                            modname: "foo".to_string(),
+                        })
+                .expect("error registering module");
+        std::io::stderr().write(b"load\n");
     }
     __load_napi_module
 };
