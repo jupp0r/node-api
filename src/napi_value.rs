@@ -105,14 +105,34 @@ impl<T> ToNapiValue for [T]
     where T: ToNapiValue
 {
     fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        let set_item_in_array =
-            |env: napi::NapiEnv, array: napi::NapiValue, index: usize, item: &T| {
-                item.to_napi_value(env)
-                    .and_then(|converted_item| napi::set_element(env, array, index, converted_item))
-            };
+        let set_item_in_array = |env, array, index, item: &T| {
+            item.to_napi_value(env)
+                .and_then(|converted_item| napi::set_element(env, array, index, converted_item))
+        };
 
-        let fill_array_with_values = |array: napi::NapiValue| {
-            self.iter()
+        let fill_array_with_values = |array| {
+            self.into_iter()
+                .enumerate()
+                .map(|(i, item)| set_item_in_array(env, array, i, item))
+                .collect::<Result<Vec<()>>>()
+                .map(|_| array)
+        };
+
+        napi::array_with_length(env, self.len()).and_then(fill_array_with_values)
+    }
+}
+
+impl<T> ToNapiValue for Vec<T>
+    where T: ToNapiValue
+{
+    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        let set_item_in_array = |env, array, index, item: &T| {
+            item.to_napi_value(env)
+                .and_then(|converted_item| napi::set_element(env, array, index, converted_item))
+        };
+
+        let fill_array_with_values = |array| {
+            self.into_iter()
                 .enumerate()
                 .map(|(i, item)| set_item_in_array(env, array, i, item))
                 .collect::<Result<Vec<()>>>()

@@ -14,4 +14,7 @@ describe("node-api", function() {
     it("can return booleans", function() {
         expect(nt.returns_booleans()).to.equal(true);
     });
+    it("can return arrays", function() {
+        expect(nt.returns_arrays()).to.deep.equal(["one", "two", "three"]);
+    });
 });

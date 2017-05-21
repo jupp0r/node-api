@@ -2,10 +2,10 @@
 #[macro_use(napi_module)]
 extern crate node_api;
 
-napi_module!("tests", register);
-
 use node_api::{NapiEnv, NapiValue, FromNapiValues, ToNapiValue};
 use node_api::{create_function, set_named_property, create_object};
+
+napi_module!("tests", register);
 
 #[no_mangle]
 pub extern "C" fn register(env: NapiEnv,
@@ -16,6 +16,7 @@ pub extern "C" fn register(env: NapiEnv,
     register_test(env, "returns_strings", exports, &returns_strings);
     register_test(env, "returns_numbers", exports, &returns_numbers);
     register_test(env, "returns_booleans", exports, &returns_booleans);
+    register_test(env, "returns_arrays", exports, &returns_arrays);
 }
 
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
@@ -63,4 +64,9 @@ fn returns_numbers(_: NapiEnv, _: ()) -> u64 {
 // returns booleans
 fn returns_booleans(_: NapiEnv, _: ()) -> bool {
     true
+}
+
+// returns arrays
+fn returns_arrays(_: NapiEnv, _: ()) -> Vec<&'static str> {
+    vec!["one", "two", "three"]
 }
