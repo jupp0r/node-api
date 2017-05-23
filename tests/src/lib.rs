@@ -2,8 +2,8 @@
 #[macro_use(napi_module)]
 extern crate node_api;
 
-use node_api::{NapiEnv, NapiValue, FromNapiValues, ToNapiValue};
-use node_api::{create_function, set_named_property, create_object};
+use node_api::{NapiEnv, NapiValue, FromNapiValues, ToNapiValue, NapiError, NapiErrorType};
+use node_api::{create_function, get_named_property, set_named_property, create_object};
 
 napi_module!("tests", register);
 
@@ -17,6 +17,7 @@ pub extern "C" fn register(env: NapiEnv,
     register_test(env, "returns_numbers", exports, &returns_numbers);
     register_test(env, "returns_booleans", exports, &returns_booleans);
     register_test(env, "returns_arrays", exports, &returns_arrays);
+    register_test(env, "receives_objects", exports, &receives_objects);
 }
 
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
@@ -29,18 +30,20 @@ fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
 }
 
 // returns objects
-fn returns_objects(_: NapiEnv, _: ()) -> ReturnsObjectsReturn {
-    ReturnsObjectsReturn {
+fn returns_objects(_: NapiEnv, _: ()) -> Object {
+    Object {
         foo: "hello".to_string(),
         bar: 42,
     }
 }
 
-struct ReturnsObjectsReturn {
+#[derive(Debug)]
+struct Object {
     pub foo: String,
     pub bar: u64,
 }
-impl ToNapiValue for ReturnsObjectsReturn {
+
+impl ToNapiValue for Object {
     fn to_napi_value(&self, env: NapiEnv) -> node_api::Result<NapiValue> {
         let object = create_object(env)?;
         let foo = self.foo.to_napi_value(env)?;
@@ -48,6 +51,43 @@ impl ToNapiValue for ReturnsObjectsReturn {
         set_named_property(env, object, "foo", foo)?;
         set_named_property(env, object, "bar", bar)?;
         Ok(object)
+    }
+}
+
+impl FromNapiValues for Object {
+    fn from_napi_values(env: NapiEnv, napi_values: &[NapiValue]) -> node_api::Result<Object> {
+        match napi_values.len() {
+            1 => {
+                let object = napi_values[0];
+                let foo_property = get_named_property(env, object, "foo")?;
+                let bar_property = get_named_property(env, object, "bar")?;
+                Ok(Object {
+                       foo: FromNapiValues::from_napi_values(env, &[foo_property])?,
+                       bar: FromNapiValues::from_napi_values(env, &[bar_property])?,
+                   })
+            }
+            n => {
+                Err(NapiError {
+                        error_message: "expected one argument, got ".to_string() + &n.to_string(),
+                        engine_error_code: 0,
+                        error_code: NapiErrorType::InvalidArg,
+                    })
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ReceivesObjectsArgs {
+    pub arg0: Object,
+}
+
+impl FromNapiValues for ReceivesObjectsArgs {
+    fn from_napi_values(env: NapiEnv,
+                        napi_values: &[NapiValue])
+                        -> node_api::Result<ReceivesObjectsArgs> {
+        let arg0 = Object::from_napi_values(env, napi_values)?;
+        Ok(ReceivesObjectsArgs { arg0: arg0 })
     }
 }
 
@@ -69,4 +109,8 @@ fn returns_booleans(_: NapiEnv, _: ()) -> bool {
 // returns arrays
 fn returns_arrays(_: NapiEnv, _: ()) -> Vec<&'static str> {
     vec!["one", "two", "three"]
+}
+
+fn receives_objects(_: NapiEnv, args: ReceivesObjectsArgs) -> Object {
+    args.arg0
 }

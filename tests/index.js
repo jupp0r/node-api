@@ -17,4 +17,8 @@ describe("node-api", function() {
     it("can return arrays", function() {
         expect(nt.returns_arrays()).to.deep.equal(["one", "two", "three"]);
     });
+    it("can receive objects", function() {
+        const object = {'foo': 'hello', bar: 42};
+        expect(nt.receives_objects(object)).to.deep.equal(object);
+    });
 });

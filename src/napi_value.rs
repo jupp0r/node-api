@@ -1,7 +1,7 @@
 use napi;
 
 use std::iter::Iterator;
-use napi::Result;
+use napi::{Result, NapiError, NapiErrorType, NapiValueType};
 
 pub trait FromNapiValues: Sized {
     fn from_napi_values(napi::NapiEnv, &[napi::NapiValue]) -> Result<Self>;
@@ -12,6 +12,51 @@ impl FromNapiValues for () {
         Ok(())
     }
 }
+
+impl FromNapiValues for u64 {
+    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+        check_napi_args_length(env, napi_values, 1)?;
+        let value = napi_values[0];
+        check_napi_type(env, NapiValueType::Number, value)?;
+        napi::get_value_uint32(env, value).map(|x| x as u64)
+    }
+}
+
+impl FromNapiValues for String {
+    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+        check_napi_args_length(env, napi_values, 1)?;
+        let value = napi_values[0];
+        check_napi_type(env, NapiValueType::String, value)?;
+        napi::get_value_string_utf8(env, value)
+    }
+}
+
+fn check_napi_args_length(env: napi::NapiEnv, napi_values: &[napi::NapiValue], expected_length: usize) -> Result<()> {
+    let values_length = napi_values.len();
+    if values_length == expected_length {
+        Ok(())
+    } else {
+        Err(NapiError {
+            error_message: format!("expected {} argument, got {}", expected_length, values_length),
+            engine_error_code: 0,
+            error_code: NapiErrorType::InvalidArg,
+        })
+    }
+}
+
+fn check_napi_type(env: napi::NapiEnv, expected_type: NapiValueType, value: napi::NapiValue) -> Result<()> {
+    let value_type = napi::type_of(env, value)?;
+    if expected_type == value_type {
+        Ok(())
+    } else {
+        Err(NapiError {
+                error_message: format!("expected argument to be of type {:?}, but found it to be of type {:?}", expected_type, value_type),
+                engine_error_code: 0,
+            error_code: NapiErrorType::InvalidArg,
+        })
+    }
+}
+
 
 pub trait ToNapiValue {
     fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue>;

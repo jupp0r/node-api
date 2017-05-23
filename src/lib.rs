@@ -5,9 +5,10 @@ extern crate node_api_sys;
 mod napi;
 mod napi_value;
 
-pub use napi::{NapiValue, NapiError, NapiEnv, NapiModule, Result};
+pub use napi::{NapiValue, NapiError, NapiErrorType, NapiEnv, NapiModule, Result};
 pub use napi::{get_null, get_undefined, get_global, get_boolean, create_array, array_with_length,
-               create_number, module_register, create_object, set_named_property, create_function};
+               create_number, module_register, create_object, get_named_property,
+               set_named_property, create_function};
 pub use napi_value::{FromNapiValues, ToNapiValue};
 
 #[macro_export]

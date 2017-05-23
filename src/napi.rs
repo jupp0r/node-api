@@ -45,7 +45,13 @@ impl From<std::ffi::NulError> for NapiError {
     }
 }
 
-#[derive(Debug, Clone)]
+impl From<std::string::FromUtf8Error> for NapiError {
+    fn from(err: std::string::FromUtf8Error) -> Self {
+        make_generic_napi_error(&format!("{:?}", err))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum NapiErrorType {
     InvalidArg,
     ObjectExpected,
@@ -77,6 +83,35 @@ impl From<napi_status> for NapiErrorType {
             napi_status::napi_cancelled => NapiErrorType::Cancelled,
             napi_status::napi_status_last => NapiErrorType::StatusLast,
             _ => NapiErrorType::GenericFailure,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum NapiValueType {
+    Undefined,
+    Null,
+    Boolean,
+    Number,
+    String,
+    Symbol,
+    Object,
+    Function,
+    External,
+}
+
+impl From<napi_valuetype> for NapiValueType {
+    fn from(s: napi_valuetype) -> Self {
+        match s {
+            napi_valuetype::napi_undefined => NapiValueType::Undefined,
+            napi_valuetype::napi_null => NapiValueType::Null,
+            napi_valuetype::napi_boolean => NapiValueType::Boolean,
+            napi_valuetype::napi_number => NapiValueType::Number,
+            napi_valuetype::napi_string => NapiValueType::String,
+            napi_valuetype::napi_symbol => NapiValueType::Symbol,
+            napi_valuetype::napi_object => NapiValueType::Object,
+            napi_valuetype::napi_function => NapiValueType::Function,
+            napi_valuetype::napi_external => NapiValueType::External,
         }
     }
 }
@@ -237,10 +272,7 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
         assert!(status == napi_status::napi_ok);
         assert!(user_data != std::ptr::null_mut());
 
-        let args = match argc {
-            0 => T::from_napi_values(env, &[]).expect("cannot convert arguments"),
-            _ => T::from_napi_values(env, &argv[0..(argc - 1)]).expect("cannot convert arguments"),
-        };
+        let args = T::from_napi_values(env, &argv[0..argc]).expect("cannot convert arguments");
 
         let callback: Box<Option<F>> = Box::from_raw(user_data as *mut Option<F>);
 
@@ -277,9 +309,11 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
 //                                    result: *mut napi_value) -> napi_status;
 
 
-//     pub fn napi_typeof(env: napi_env, value: napi_value,
-//                        result: *mut napi_valuetype) -> napi_status;
-
+pub fn type_of(env: NapiEnv, napi_value: NapiValue) -> Result<NapiValueType> {
+    let mut napi_value_type = napi_valuetype::napi_undefined;
+    let status = unsafe { napi_typeof(env, napi_value, &mut napi_value_type) };
+    napi_either(env, status, NapiValueType::from(napi_value_type))
+}
 
 //     pub fn napi_get_value_double(env: napi_env, value: napi_value,
 //                                  result: *mut f64) -> napi_status;
@@ -292,6 +326,11 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
 //     pub fn napi_get_value_uint32(env: napi_env, value: napi_value,
 //                                  result: *mut u32) -> napi_status;
 
+pub fn get_value_uint32(env: NapiEnv, value: NapiValue) -> Result<u32> {
+    let mut result: u32 = 0;
+    let status = unsafe { napi_get_value_uint32(env, value, &mut result) };
+    napi_either(env, status, result)
+}
 
 //     pub fn napi_get_value_int64(env: napi_env, value: napi_value,
 //                                 result: *mut i64) -> napi_status;
@@ -311,7 +350,39 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
 //                                       buf: *mut ::std::os::raw::c_char,
 //                                       bufsize: usize, result: *mut usize)
 //      -> napi_status;
-// pub fn get_value_string_utf8(env: NapiEnv, va)
+pub fn get_value_string_utf8(env: NapiEnv, value: NapiValue) -> Result<String> {
+    let mut size: usize = 0;
+    // obtain string length in bytes to determine buffer size
+    let size_status =
+        unsafe { napi_get_value_string_utf8(env, value, std::ptr::null_mut(), 0, &mut size) };
+    napi_either(env, size_status, size)?;
+    let mut buffer: Vec<u8> = Vec::with_capacity(size);
+    let mut written: usize = 0;
+    let status = unsafe {
+        napi_get_value_string_utf8(env,
+                                   value,
+                                   buffer.as_mut_ptr() as *mut i8,
+                                   size + 1,
+                                   &mut written)
+    };
+    match written == size {
+        true => {
+            napi_either(env, status, unsafe {
+                buffer.set_len(size);
+                String::from_utf8(buffer)?
+            })
+        }
+        false => {
+            Err(NapiError {
+                    error_message: format!("buffer size mismatch, expected {}, got {}",
+                                           size,
+                                           written),
+                    engine_error_code: 0,
+                    error_code: NapiErrorType::GenericFailure,
+                })
+        }
+    }
+}
 
 
 
@@ -376,11 +447,12 @@ pub fn set_named_property(env: NapiEnv,
 //                                    utf8name: *const ::std::os::raw::c_char,
 //                                    result: *mut bool) -> napi_status;
 
-
-//     pub fn napi_get_named_property(env: napi_env, object: napi_value,
-//                                    utf8name: *const ::std::os::raw::c_char,
-//                                    result: *mut napi_value) -> napi_status;
-
+pub fn get_named_property(env: NapiEnv, object: NapiValue, name: &str) -> Result<NapiValue> {
+    let mut result: NapiValue = 0;
+    let status =
+        unsafe { napi_get_named_property(env, object, CString::new(name)?.as_ptr(), &mut result) };
+    napi_either(env, status, result)
+}
 
 pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValue) -> Result<()> {
     let status = unsafe { napi_set_element(env, array, index as u32, value) };
