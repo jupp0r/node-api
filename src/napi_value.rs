@@ -22,6 +22,15 @@ impl FromNapiValues for u64 {
     }
 }
 
+impl FromNapiValues for i64 {
+    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+        check_napi_args_length(env, napi_values, 1)?;
+        let value = napi_values[0];
+        check_napi_type(env, NapiValueType::Number, value)?;
+        napi::get_value_int64(env, value)
+    }
+}
+
 impl FromNapiValues for String {
     fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;

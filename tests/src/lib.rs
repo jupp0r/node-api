@@ -21,6 +21,8 @@ pub extern "C" fn register(env: NapiEnv,
     register_test(env, "receives_strings", exports, &receives_strings);
     register_test(env, "receives_booleans", exports, &receives_booleans);
     register_test(env, "receives_f64", exports, &receives_f64);
+    register_test(env, "receives_u64", exports, &receives_u64);
+    register_test(env, "receives_i64", exports, &receives_i64);
 }
 
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
@@ -123,5 +125,13 @@ fn receives_booleans(_: NapiEnv, arg: bool) -> bool {
 }
 
 fn receives_f64(_: NapiEnv, arg: f64) -> f64 {
+    arg
+}
+
+fn receives_u64(_: NapiEnv, arg: u64) -> u64 {
+    arg
+}
+
+fn receives_i64(_: NapiEnv, arg: i64) -> i64 {
     arg
 }

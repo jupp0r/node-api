@@ -325,17 +325,18 @@ pub fn get_value_double(env: NapiEnv, value: NapiValue) -> Result<f64> {
 //                                 result: *mut i32) -> napi_status;
 
 
-//     pub fn napi_get_value_uint32(env: napi_env, value: napi_value,
-//                                  result: *mut u32) -> napi_status;
-
 pub fn get_value_uint32(env: NapiEnv, value: NapiValue) -> Result<u32> {
     let mut result: u32 = 0;
     let status = unsafe { napi_get_value_uint32(env, value, &mut result) };
     napi_either(env, status, result)
 }
 
-//     pub fn napi_get_value_int64(env: napi_env, value: napi_value,
-//                                 result: *mut i64) -> napi_status;
+pub fn get_value_int64(env: NapiEnv, value: NapiValue) -> Result<i64> {
+    let mut result: i64 = 0;
+    let status = unsafe { napi_get_value_int64(env, value, &mut result) };
+    napi_either(env, status, result)
+}
+
 
 
 pub fn get_value_bool(env: NapiEnv, value: NapiValue) -> Result<bool> {

@@ -36,5 +36,13 @@ describe("node-api", function() {
             const n = 1.1;
             expect(nt.receives_f64(n)).to.deep.equal(n);
         });
+        it("can receive u64", function() {
+            const n = 123;
+            expect(nt.receives_u64(n)).to.deep.equal(n);
+        });
+        it("can receive i64", function() {
+            const i = -42;
+            expect(nt.receives_i64(i)).to.deep.equal(i);
+        });
     });
 });
