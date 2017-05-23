@@ -315,9 +315,11 @@ pub fn type_of(env: NapiEnv, napi_value: NapiValue) -> Result<NapiValueType> {
     napi_either(env, status, NapiValueType::from(napi_value_type))
 }
 
-//     pub fn napi_get_value_double(env: napi_env, value: napi_value,
-//                                  result: *mut f64) -> napi_status;
-
+pub fn get_value_double(env: NapiEnv, value: NapiValue) -> Result<f64> {
+    let mut result: f64 = std::f64::NAN;
+    let status = unsafe { napi_get_value_double(env, value, &mut result) };
+    napi_either(env, status, result)
+}
 
 //     pub fn napi_get_value_int32(env: napi_env, value: napi_value,
 //                                 result: *mut i32) -> napi_status;

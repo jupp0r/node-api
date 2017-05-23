@@ -32,5 +32,9 @@ describe("node-api", function() {
             const b = true;
             expect(nt.receives_booleans(b)).to.deep.equal(b);
         });
+        it("can receive f64", function() {
+            const n = 1.1;
+            expect(nt.receives_f64(n)).to.deep.equal(n);
+        });
     });
 });
