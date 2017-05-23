@@ -3,10 +3,12 @@ use std::boxed::Box;
 use std::ffi::{CStr, CString};
 use node_api_sys::*;
 
-use napi_value::{FromNapiValues, ToNapiValue};
+use napi_value::{FromNapiValues, IntoNapiValue};
 
-pub type NapiValue = napi_value;
 pub type NapiEnv = napi_env;
+pub type NapiRef = napi_ref;
+pub type NapiValue = napi_value;
+
 pub type Result<T> = std::result::Result<T, NapiError>;
 
 #[derive(Debug, Clone)]
@@ -124,7 +126,7 @@ fn make_generic_napi_error(message: &str) -> NapiError {
     }
 }
 
-fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
+pub fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
     match status {
         napi_status::napi_ok => Ok(val),
         _err => Err(get_last_napi_error(env).expect("error fetching last napi error")),
@@ -251,34 +253,36 @@ pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
 //                               result: *mut napi_value) -> napi_status;
 
 pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<NapiValue>
-    where F: Fn(NapiEnv, T) -> R,
+    where F: Fn(NapiEnv, NapiValue, T) -> R,
           T: FromNapiValues,
-          R: ToNapiValue
+          R: IntoNapiValue
 {
     unsafe extern "C" fn wrapper<F, T, R>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
-        where F: Fn(NapiEnv, T) -> R,
+        where F: Fn(NapiEnv, NapiValue, T) -> R,
               T: FromNapiValues,
-              R: ToNapiValue
+              R: IntoNapiValue
     {
         let mut argc: usize = 16;
         let mut argv: [NapiValue; 16] = std::mem::uninitialized();
         let mut user_data = std::ptr::null_mut();
+        let mut this: NapiValue = 0;
         let status = napi_get_cb_info(env,
                                       cbinfo,
                                       &mut argc,
                                       argv.as_mut_ptr(),
-                                      std::ptr::null_mut(),
+                                      &mut this,
                                       &mut user_data);
         assert!(status == napi_status::napi_ok);
         assert!(user_data != std::ptr::null_mut());
 
-        let args = T::from_napi_values(env, &argv[0..argc]).expect("cannot convert arguments");
+        let args =
+            T::from_napi_values(env, this, &argv[0..argc]).expect("cannot convert arguments");
 
         let callback: Box<Option<F>> = Box::from_raw(user_data as *mut Option<F>);
 
-        let return_value = callback.expect("no callback found")(env, args);
+        let return_value = callback.expect("no callback found")(env, this, args);
         return_value
-            .to_napi_value(env)
+            .into_napi_value(env)
             .unwrap_or(get_undefined(env).unwrap())
     }
 
@@ -464,9 +468,11 @@ pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValu
 //                             result: *mut bool) -> napi_status;
 
 
-//     pub fn napi_get_element(env: napi_env, object: napi_value, index: u32,
-//                             result: *mut napi_value) -> napi_status;
-
+pub fn get_element(env: NapiEnv, array: NapiValue, index: usize) -> Result<NapiValue> {
+    let mut result: NapiValue = 0;
+    let status = unsafe { napi_get_element(env, array, index as u32, &mut result) };
+    napi_either(env, status, result)
+}
 
 //     pub fn napi_define_properties(env: napi_env, object: napi_value,
 //                                   property_count: usize,
@@ -474,13 +480,17 @@ pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValu
 //      -> napi_status;
 
 
-//     pub fn napi_is_array(env: napi_env, value: napi_value, result: *mut bool)
-//      -> napi_status;
+pub fn is_array(env: NapiEnv, value: NapiValue) -> Result<bool> {
+    let mut result: bool = false;
+    let status = unsafe { napi_is_array(env, value, &mut result) };
+    napi_either(env, status, result)
+}
 
-
-//     pub fn napi_get_array_length(env: napi_env, value: napi_value,
-//                                  result: *mut u32) -> napi_status;
-
+pub fn get_array_length(env: NapiEnv, value: NapiValue) -> Result<usize> {
+    let mut result: u32 = 0;
+    let status = unsafe { napi_get_array_length(env, value, &mut result) };
+    napi_either(env, status, result as usize)
+}
 
 //     pub fn napi_strict_equals(env: napi_env, lhs: napi_value, rhs: napi_value,
 //                               result: *mut bool) -> napi_status;
@@ -533,19 +543,52 @@ pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValu
 //                      finalize_cb: napi_finalize,
 //                      finalize_hint: *mut ::std::os::raw::c_void,
 //                      result: *mut napi_ref) -> napi_status;
-
+pub fn wrap<T>(env: NapiEnv, js_object: NapiValue, native_object: Box<T>) -> Result<NapiRef> {
+    let mut result: NapiRef = unsafe { std::mem::uninitialized() };
+    let status = unsafe {
+        napi_wrap(env,
+                  js_object,
+                  Box::into_raw(native_object) as *mut ::std::os::raw::c_void,
+                  Some(finalize_box::<T>),
+                  std::ptr::null_mut(),
+                  &mut result)
+    };
+    napi_either(env, status, result)
+}
 
 //     pub fn napi_unwrap(env: napi_env, js_object: napi_value,
 //                        result: *mut *mut ::std::os::raw::c_void)
 //      -> napi_status;
-
+pub fn unwrap<T>(env: NapiEnv, js_object: NapiValue) -> Result<Box<T>> {
+    let mut result = std::ptr::null_mut();
+    let status = unsafe { napi_unwrap(env, js_object, &mut result) };
+    napi_either(env, status, unsafe { Box::<T>::from_raw(result as *mut T) })
+}
 
 //     pub fn napi_create_external(env: napi_env,
 //                                 data: *mut ::std::os::raw::c_void,
 //                                 finalize_cb: napi_finalize,
 //                                 finalize_hint: *mut ::std::os::raw::c_void,
 //                                 result: *mut napi_value) -> napi_status;
+pub fn create_external<T>(env: NapiEnv, t: Box<T>) -> Result<NapiValue> {
 
+    let mut result: NapiValue = 0;
+    let status = unsafe {
+        napi_create_external(env,
+                             Box::into_raw(t) as *mut ::std::os::raw::c_void,
+                             Some(finalize_box::<T>),
+                             std::ptr::null_mut(),
+                             &mut result)
+    };
+    napi_either(env, status, result)
+}
+
+unsafe extern "C" fn finalize_box<T>(_env: NapiEnv,
+                                     finalize_data: *mut ::std::os::raw::c_void,
+                                     _finalize_hint: *mut ::std::os::raw::c_void) {
+    // move ownership into transient box in order to handle Drop, etc
+    Box::from_raw(finalize_data as *mut T);
+}
 
 //     pub fn napi_get_value_external(env: napi_env, value: napi_value,
 //                                    result: *mut *mut ::std::os::raw::c_void)

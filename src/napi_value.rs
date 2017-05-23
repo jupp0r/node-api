@@ -1,20 +1,22 @@
 use napi;
+use futures::future;
+use futures::future::Future;
 
-use std::iter::Iterator;
 use napi::{Result, NapiError, NapiErrorType, NapiValueType};
+use napi_futures;
 
 pub trait FromNapiValues: Sized {
-    fn from_napi_values(napi::NapiEnv, &[napi::NapiValue]) -> Result<Self>;
+    fn from_napi_values(napi::NapiEnv, napi::NapiValue, &[napi::NapiValue]) -> Result<Self>;
 }
 
 impl FromNapiValues for () {
-    fn from_napi_values(_: napi::NapiEnv, _: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(_: napi::NapiEnv, _: napi::NapiValue, _: &[napi::NapiValue]) -> Result<Self> {
         Ok(())
     }
 }
 
 impl FromNapiValues for u64 {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Number, value)?;
@@ -23,7 +25,7 @@ impl FromNapiValues for u64 {
 }
 
 impl FromNapiValues for i64 {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Number, value)?;
@@ -32,7 +34,7 @@ impl FromNapiValues for i64 {
 }
 
 impl FromNapiValues for String {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::String, value)?;
@@ -41,7 +43,7 @@ impl FromNapiValues for String {
 }
 
 impl FromNapiValues for bool {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Boolean, value)?;
@@ -50,11 +52,33 @@ impl FromNapiValues for bool {
 }
 
 impl FromNapiValues for f64 {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Number, value)?;
         napi::get_value_double(env, value)
+    }
+}
+
+impl<T> FromNapiValues for Vec<T> where T: FromNapiValues {
+    fn from_napi_values(env: napi::NapiEnv, this: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
+        check_napi_args_length(env, napi_values, 1)?;
+        let value = napi_values[0];
+
+        if !napi::is_array(env, value)? {
+            Err(NapiError{error_message: "expected array".to_string(),
+                          engine_error_code: 0,
+                          error_code: NapiErrorType::InvalidArg,
+            })
+        } else {
+            let size = napi::get_array_length(env, value)?;
+            let mut result = Vec::with_capacity(size);
+            for i in 0..size {
+                let ival = napi::get_element(env, value, i)?;
+                result.push(FromNapiValues::from_napi_values(env, this, &[ival])?);
+            }
+            Ok(result)
+        }
     }
 }
 
@@ -85,132 +109,145 @@ fn check_napi_type(env: napi::NapiEnv, expected_type: NapiValueType, value: napi
 }
 
 
-pub trait ToNapiValue {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue>;
+pub trait IntoNapiValue {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue>;
 }
 
-impl ToNapiValue for () {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+impl IntoNapiValue for () {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         napi::get_undefined(env)
     }
 }
 
-impl ToNapiValue for String {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+impl IntoNapiValue for String {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         napi::create_string_utf8(env, self)
     }
 }
 
-impl<'a> ToNapiValue for &'a str {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+impl<'a> IntoNapiValue for &'a str {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         napi::create_string_utf8(env, self)
     }
 }
 
-impl ToNapiValue for u8 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for u8 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for u16 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for u16 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for u32 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for u32 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for u64 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for u64 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for i8 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for i8 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for i16 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for i16 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for i32 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for i32 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for i64 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for i64 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for f32 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for f32 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for f64 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, *self as f64)
+impl IntoNapiValue for f64 {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::create_number(env, self as f64)
     }
 }
 
-impl ToNapiValue for bool {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::get_boolean(env, *self)
+impl IntoNapiValue for bool {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        napi::get_boolean(env, self)
     }
 }
 
-impl<T> ToNapiValue for [T]
-    where T: ToNapiValue
+impl<'a, T> IntoNapiValue for &'a [T]
+    where T: IntoNapiValue + Clone
 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        let set_item_in_array = |env, array, index, item: &T| {
-            item.to_napi_value(env)
-                .and_then(|converted_item| napi::set_element(env, array, index, converted_item))
-        };
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        let array = napi::array_with_length(env, self.len())?;
 
-        let fill_array_with_values = |array| {
-            self.into_iter()
-                .enumerate()
-                .map(|(i, item)| set_item_in_array(env, array, i, item))
-                .collect::<Result<Vec<()>>>()
-                .map(|_| array)
-        };
-
-        napi::array_with_length(env, self.len()).and_then(fill_array_with_values)
+        let mut index: usize = 0;
+        for item in self.into_iter() {
+            let converted_item = item.clone().into_napi_value(env)?;
+            napi::set_element(env, array, index, converted_item)?;
+            index = index + 1;
+        }
+        Ok(array)
     }
 }
 
-impl<T> ToNapiValue for Vec<T>
-    where T: ToNapiValue
+impl<T> IntoNapiValue for Vec<T>
+    where T: IntoNapiValue
 {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        let set_item_in_array = |env, array, index, item: &T| {
-            item.to_napi_value(env)
-                .and_then(|converted_item| napi::set_element(env, array, index, converted_item))
-        };
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        let array = napi::array_with_length(env, self.len())?;
 
-        let fill_array_with_values = |array| {
-            self.into_iter()
-                .enumerate()
-                .map(|(i, item)| set_item_in_array(env, array, i, item))
-                .collect::<Result<Vec<()>>>()
-                .map(|_| array)
-        };
+        let mut index: usize = 0;
+        for item in self.into_iter() {
+            let converted_item = item.into_napi_value(env)?;
+            napi::set_element(env, array, index, converted_item)?;
+            index = index + 1;
+        }
+        Ok(array)
+    }
+}
 
-        napi::array_with_length(env, self.len()).and_then(fill_array_with_values)
+impl<T, E> IntoNapiValue for future::BoxFuture<T, E>
+    where T: IntoNapiValue + 'static,
+          E: IntoNapiValue + 'static,
+{
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        let obj = napi::create_object(env)?;
+        napi::wrap(env, obj, Box::new(self))?;
+        let then = napi::create_function(env, "then", |env, this, then_args: napi_futures::ThenArgs<T, E>| {
+            // todo @juppm: remove unwrap
+            let future: Box<future::BoxFuture<T,E>> = napi::unwrap(env, this).unwrap();
+            future.then(move |result| {
+                match result {
+                    Ok(val) => (then_args.on_fulfilled)(env, val),
+                    Err(err) => (then_args.on_rejected)(env, err)
+                }
+                future::result::<(),()>(Ok(())).boxed()
+            }).boxed()
+        })?;
+        napi::set_named_property(env, obj, "then", then)?;
+        Ok(obj)
     }
 }

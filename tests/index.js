@@ -44,5 +44,16 @@ describe("node-api", function() {
             const i = -42;
             expect(nt.receives_i64(i)).to.deep.equal(i);
         });
+        it("can receive arrays", function() {
+            const arr = ["one", "two", "three"];
+            expect(nt.receives_arrays(arr)).to.deep.equal(arr);
+        });
+    });
+    describe("promises", function() {
+        it("returns a void promise", function(done) {
+            return nt.returns_promises().then(function() {
+                done();
+            });
+        });
     });
 });
