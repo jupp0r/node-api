@@ -356,7 +356,7 @@ pub fn get_value_string_utf8(env: NapiEnv, value: NapiValue) -> Result<String> {
     let size_status =
         unsafe { napi_get_value_string_utf8(env, value, std::ptr::null_mut(), 0, &mut size) };
     napi_either(env, size_status, size)?;
-    let mut buffer: Vec<u8> = Vec::with_capacity(size);
+    let mut buffer: Vec<u8> = Vec::with_capacity(size + 1);
     let mut written: usize = 0;
     let status = unsafe {
         napi_get_value_string_utf8(env,
