@@ -58,6 +58,28 @@ impl FromNapiValues for f64 {
     }
 }
 
+impl<T> FromNapiValues for Vec<T> where T: FromNapiValues {
+    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+        check_napi_args_length(env, napi_values, 1)?;
+        let value = napi_values[0];
+
+        if !napi::is_array(env, value)? {
+            Err(NapiError{error_message: "expected array".to_string(),
+                          engine_error_code: 0,
+                          error_code: NapiErrorType::InvalidArg,
+            })
+        } else {
+            let size = napi::get_array_length(env, value)?;
+            let mut result = Vec::with_capacity(size);
+            for i in 0..size {
+                let ival = napi::get_element(env, value, i)?;
+                result.push(FromNapiValues::from_napi_values(env, &[ival])?);
+            }
+            Ok(result)
+        }
+    }
+}
+
 fn check_napi_args_length(_env: napi::NapiEnv, napi_values: &[napi::NapiValue], expected_length: usize) -> Result<()> {
     let values_length = napi_values.len();
     if values_length == expected_length {

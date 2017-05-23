@@ -464,9 +464,11 @@ pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValu
 //                             result: *mut bool) -> napi_status;
 
 
-//     pub fn napi_get_element(env: napi_env, object: napi_value, index: u32,
-//                             result: *mut napi_value) -> napi_status;
-
+pub fn get_element(env: NapiEnv, array: NapiValue, index: usize) -> Result<NapiValue> {
+    let mut result: NapiValue = 0;
+    let status = unsafe { napi_get_element(env, array, index as u32, &mut result) };
+    napi_either(env, status, result)
+}
 
 //     pub fn napi_define_properties(env: napi_env, object: napi_value,
 //                                   property_count: usize,
@@ -474,13 +476,17 @@ pub fn set_element(env: NapiEnv, array: NapiValue, index: usize, value: NapiValu
 //      -> napi_status;
 
 
-//     pub fn napi_is_array(env: napi_env, value: napi_value, result: *mut bool)
-//      -> napi_status;
+pub fn is_array(env: NapiEnv, value: NapiValue) -> Result<bool> {
+    let mut result: bool = false;
+    let status = unsafe { napi_is_array(env, value, &mut result) };
+    napi_either(env, status, result)
+}
 
-
-//     pub fn napi_get_array_length(env: napi_env, value: napi_value,
-//                                  result: *mut u32) -> napi_status;
-
+pub fn get_array_length(env: NapiEnv, value: NapiValue) -> Result<usize> {
+    let mut result: u32 = 0;
+    let status = unsafe { napi_get_array_length(env, value, &mut result) };
+    napi_either(env, status, result as usize)
+}
 
 //     pub fn napi_strict_equals(env: napi_env, lhs: napi_value, rhs: napi_value,
 //                               result: *mut bool) -> napi_status;

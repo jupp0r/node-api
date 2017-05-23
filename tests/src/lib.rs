@@ -23,6 +23,7 @@ pub extern "C" fn register(env: NapiEnv,
     register_test(env, "receives_f64", exports, &receives_f64);
     register_test(env, "receives_u64", exports, &receives_u64);
     register_test(env, "receives_i64", exports, &receives_i64);
+    register_test(env, "receives_arrays", exports, &receives_arrays);
 }
 
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
@@ -133,5 +134,9 @@ fn receives_u64(_: NapiEnv, arg: u64) -> u64 {
 }
 
 fn receives_i64(_: NapiEnv, arg: i64) -> i64 {
+    arg
+}
+
+fn receives_arrays(_: NapiEnv, arg: Vec<String>) -> Vec<String> {
     arg
 }
