@@ -18,6 +18,8 @@ pub extern "C" fn register(env: NapiEnv,
     register_test(env, "returns_booleans", exports, &returns_booleans);
     register_test(env, "returns_arrays", exports, &returns_arrays);
     register_test(env, "receives_objects", exports, &receives_objects);
+    register_test(env, "receives_strings", exports, &receives_strings);
+    register_test(env, "receives_booleans", exports, &receives_booleans);
 }
 
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
@@ -91,26 +93,30 @@ impl FromNapiValues for ReceivesObjectsArgs {
     }
 }
 
-// returns strings
 fn returns_strings(_: NapiEnv, _: ()) -> String {
     "returned_string".to_string()
 }
 
-// returns numbers
 fn returns_numbers(_: NapiEnv, _: ()) -> u64 {
     42
 }
 
-// returns booleans
 fn returns_booleans(_: NapiEnv, _: ()) -> bool {
     true
 }
 
-// returns arrays
 fn returns_arrays(_: NapiEnv, _: ()) -> Vec<&'static str> {
     vec!["one", "two", "three"]
 }
 
 fn receives_objects(_: NapiEnv, args: ReceivesObjectsArgs) -> Object {
     args.arg0
+}
+
+fn receives_strings(_: NapiEnv, arg: String) -> String {
+    arg
+}
+
+fn receives_booleans(_: NapiEnv, arg: bool) -> bool {
+    arg
 }

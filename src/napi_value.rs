@@ -31,7 +31,16 @@ impl FromNapiValues for String {
     }
 }
 
-fn check_napi_args_length(env: napi::NapiEnv, napi_values: &[napi::NapiValue], expected_length: usize) -> Result<()> {
+impl FromNapiValues for bool {
+    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+        check_napi_args_length(env, napi_values, 1)?;
+        let value = napi_values[0];
+        check_napi_type(env, NapiValueType::Boolean, value)?;
+        napi::get_value_bool(env, value)
+    }
+}
+
+fn check_napi_args_length(_env: napi::NapiEnv, napi_values: &[napi::NapiValue], expected_length: usize) -> Result<()> {
     let values_length = napi_values.len();
     if values_length == expected_length {
         Ok(())

@@ -336,9 +336,11 @@ pub fn get_value_uint32(env: NapiEnv, value: NapiValue) -> Result<u32> {
 //                                 result: *mut i64) -> napi_status;
 
 
-//     pub fn napi_get_value_bool(env: napi_env, value: napi_value,
-//                                result: *mut bool) -> napi_status;
-
+pub fn get_value_bool(env: NapiEnv, value: NapiValue) -> Result<bool> {
+    let mut result = false;
+    let status = unsafe { napi_get_value_bool(env, value, &mut result) };
+    napi_either(env, status, result)
+}
 
 //     pub fn napi_get_value_string_latin1(env: napi_env, value: napi_value,
 //                                         buf: *mut ::std::os::raw::c_char,
@@ -346,10 +348,6 @@ pub fn get_value_uint32(env: NapiEnv, value: NapiValue) -> Result<u32> {
 //      -> napi_status;
 
 
-//     pub fn napi_get_value_string_utf8(env: napi_env, value: napi_value,
-//                                       buf: *mut ::std::os::raw::c_char,
-//                                       bufsize: usize, result: *mut usize)
-//      -> napi_status;
 pub fn get_value_string_utf8(env: NapiEnv, value: NapiValue) -> Result<String> {
     let mut size: usize = 0;
     // obtain string length in bytes to determine buffer size
