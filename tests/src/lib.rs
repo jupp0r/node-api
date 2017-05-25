@@ -45,7 +45,7 @@ pub extern "C" fn register(env: NapiEnv,
 //}
 
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
-    where F: Fn(NapiEnv, A) -> R,
+    where F: Fn(NapiEnv, NapiValue, A) -> R,
           A: FromNapiValues,
           R: IntoNapiValue
 {
@@ -54,7 +54,7 @@ fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
 }
 
 // returns objects
-fn returns_objects(_: NapiEnv, _: ()) -> Object {
+fn returns_objects(_: NapiEnv, _: NapiValue, _: ()) -> Object {
     Object {
         foo: "hello".to_string(),
         bar: 42,
@@ -79,15 +79,18 @@ impl IntoNapiValue for Object {
 }
 
 impl FromNapiValues for Object {
-    fn from_napi_values(env: NapiEnv, napi_values: &[NapiValue]) -> node_api::Result<Object> {
+    fn from_napi_values(env: NapiEnv,
+                        this: NapiValue,
+                        napi_values: &[NapiValue])
+                        -> node_api::Result<Object> {
         match napi_values.len() {
             1 => {
                 let object = napi_values[0];
                 let foo_property = get_named_property(env, object, "foo")?;
                 let bar_property = get_named_property(env, object, "bar")?;
                 Ok(Object {
-                       foo: FromNapiValues::from_napi_values(env, &[foo_property])?,
-                       bar: FromNapiValues::from_napi_values(env, &[bar_property])?,
+                       foo: FromNapiValues::from_napi_values(env, this, &[foo_property])?,
+                       bar: FromNapiValues::from_napi_values(env, this, &[bar_property])?,
                    })
             }
             n => {
@@ -108,57 +111,58 @@ struct ReceivesObjectsArgs {
 
 impl FromNapiValues for ReceivesObjectsArgs {
     fn from_napi_values(env: NapiEnv,
+                        this: NapiValue,
                         napi_values: &[NapiValue])
                         -> node_api::Result<ReceivesObjectsArgs> {
-        let arg0 = Object::from_napi_values(env, napi_values)?;
+        let arg0 = Object::from_napi_values(env, this, napi_values)?;
         Ok(ReceivesObjectsArgs { arg0: arg0 })
     }
 }
 
-fn returns_strings(_: NapiEnv, _: ()) -> String {
+fn returns_strings(_: NapiEnv, _: NapiValue, _: ()) -> String {
     "returned_string".to_string()
 }
 
-fn returns_numbers(_: NapiEnv, _: ()) -> u64 {
+fn returns_numbers(_: NapiEnv, _: NapiValue, _: ()) -> u64 {
     42
 }
 
-fn returns_booleans(_: NapiEnv, _: ()) -> bool {
+fn returns_booleans(_: NapiEnv, _: NapiValue, _: ()) -> bool {
     true
 }
 
-fn returns_arrays(_: NapiEnv, _: ()) -> Vec<&'static str> {
+fn returns_arrays(_: NapiEnv, _: NapiValue, _: ()) -> Vec<&'static str> {
     vec!["one", "two", "three"]
 }
 
-fn receives_objects(_: NapiEnv, args: ReceivesObjectsArgs) -> Object {
+fn receives_objects(_: NapiEnv, _: NapiValue, args: ReceivesObjectsArgs) -> Object {
     args.arg0
 }
 
-fn receives_strings(_: NapiEnv, arg: String) -> String {
+fn receives_strings(_: NapiEnv, _: NapiValue, arg: String) -> String {
     arg
 }
 
-fn receives_booleans(_: NapiEnv, arg: bool) -> bool {
+fn receives_booleans(_: NapiEnv, _: NapiValue, arg: bool) -> bool {
     arg
 }
 
-fn receives_f64(_: NapiEnv, arg: f64) -> f64 {
+fn receives_f64(_: NapiEnv, _: NapiValue, arg: f64) -> f64 {
     arg
 }
 
-fn receives_u64(_: NapiEnv, arg: u64) -> u64 {
+fn receives_u64(_: NapiEnv, _: NapiValue, arg: u64) -> u64 {
     arg
 }
 
-fn receives_i64(_: NapiEnv, arg: i64) -> i64 {
+fn receives_i64(_: NapiEnv, _: NapiValue, arg: i64) -> i64 {
     arg
 }
 
-fn receives_arrays(_: NapiEnv, arg: Vec<String>) -> Vec<String> {
+fn receives_arrays(_: NapiEnv, _: NapiValue, arg: Vec<String>) -> Vec<String> {
     arg
 }
 
-fn returns_promises(_: NapiEnv, _arg: ()) -> futures::BoxFuture<(), ()> {
+fn returns_promises(_: NapiEnv, _: NapiValue, _arg: ()) -> futures::BoxFuture<(), ()> {
     future::ok(()).boxed()
 }

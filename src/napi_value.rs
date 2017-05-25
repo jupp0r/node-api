@@ -6,17 +6,17 @@ use napi::{Result, NapiError, NapiErrorType, NapiValueType};
 use napi_futures;
 
 pub trait FromNapiValues: Sized {
-    fn from_napi_values(napi::NapiEnv, &[napi::NapiValue]) -> Result<Self>;
+    fn from_napi_values(napi::NapiEnv, napi::NapiValue, &[napi::NapiValue]) -> Result<Self>;
 }
 
 impl FromNapiValues for () {
-    fn from_napi_values(_: napi::NapiEnv, _: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(_: napi::NapiEnv, _: napi::NapiValue, _: &[napi::NapiValue]) -> Result<Self> {
         Ok(())
     }
 }
 
 impl FromNapiValues for u64 {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Number, value)?;
@@ -25,7 +25,7 @@ impl FromNapiValues for u64 {
 }
 
 impl FromNapiValues for i64 {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Number, value)?;
@@ -34,7 +34,7 @@ impl FromNapiValues for i64 {
 }
 
 impl FromNapiValues for String {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::String, value)?;
@@ -43,7 +43,7 @@ impl FromNapiValues for String {
 }
 
 impl FromNapiValues for bool {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Boolean, value)?;
@@ -52,7 +52,7 @@ impl FromNapiValues for bool {
 }
 
 impl FromNapiValues for f64 {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
         check_napi_type(env, NapiValueType::Number, value)?;
@@ -61,7 +61,7 @@ impl FromNapiValues for f64 {
 }
 
 impl<T> FromNapiValues for Vec<T> where T: FromNapiValues {
-    fn from_napi_values(env: napi::NapiEnv, napi_values: &[napi::NapiValue]) -> Result<Self> {
+    fn from_napi_values(env: napi::NapiEnv, this: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
         check_napi_args_length(env, napi_values, 1)?;
         let value = napi_values[0];
 
@@ -75,7 +75,7 @@ impl<T> FromNapiValues for Vec<T> where T: FromNapiValues {
             let mut result = Vec::with_capacity(size);
             for i in 0..size {
                 let ival = napi::get_element(env, value, i)?;
-                result.push(FromNapiValues::from_napi_values(env, &[ival])?);
+                result.push(FromNapiValues::from_napi_values(env, this, &[ival])?);
             }
             Ok(result)
         }
@@ -230,19 +230,21 @@ impl<T> IntoNapiValue for Vec<T>
 }
 
 impl<T, E> IntoNapiValue for future::BoxFuture<T, E>
-    where T: IntoNapiValue,
-          E: IntoNapiValue,
+    where T: IntoNapiValue + 'static,
+          E: IntoNapiValue + 'static,
 {
     fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         let obj = napi::create_object(env)?;
         napi::wrap(env, obj, Box::new(self))?;
-        let then = napi::create_function(env, "then", move |env, then_args: napi_futures::ThenArgs<T, E>| {
-            self.then(move |result| {
+        let then = napi::create_function(env, "then", |env, this, then_args: napi_futures::ThenArgs<T, E>| {
+            // todo @juppm: remove unwrap
+            let future: Box<future::BoxFuture<T,E>> = napi::unwrap(env, this).unwrap();
+            future.then(move |result| {
                 match result {
                     Ok(val) => (then_args.on_fulfilled)(env, val),
                     Err(err) => (then_args.on_rejected)(env, err)
                 }
-                future::result(Ok(()))
+                future::result::<(),()>(Ok(())).boxed()
             }).boxed()
         })?;
         napi::set_named_property(env, obj, "then", then)?;

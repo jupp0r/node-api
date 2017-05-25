@@ -253,32 +253,34 @@ pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
 //                               result: *mut napi_value) -> napi_status;
 
 pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<NapiValue>
-    where F: Fn(NapiEnv, T) -> R,
+    where F: Fn(NapiEnv, NapiValue, T) -> R,
           T: FromNapiValues,
           R: IntoNapiValue
 {
     unsafe extern "C" fn wrapper<F, T, R>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
-        where F: Fn(NapiEnv, T) -> R,
+        where F: Fn(NapiEnv, NapiValue, T) -> R,
               T: FromNapiValues,
               R: IntoNapiValue
     {
         let mut argc: usize = 16;
         let mut argv: [NapiValue; 16] = std::mem::uninitialized();
         let mut user_data = std::ptr::null_mut();
+        let mut this: NapiValue = 0;
         let status = napi_get_cb_info(env,
                                       cbinfo,
                                       &mut argc,
                                       argv.as_mut_ptr(),
-                                      std::ptr::null_mut(),
+                                      &mut this,
                                       &mut user_data);
         assert!(status == napi_status::napi_ok);
         assert!(user_data != std::ptr::null_mut());
 
-        let args = T::from_napi_values(env, &argv[0..argc]).expect("cannot convert arguments");
+        let args =
+            T::from_napi_values(env, this, &argv[0..argc]).expect("cannot convert arguments");
 
         let callback: Box<Option<F>> = Box::from_raw(user_data as *mut Option<F>);
 
-        let return_value = callback.expect("no callback found")(env, args);
+        let return_value = callback.expect("no callback found")(env, this, args);
         return_value
             .into_napi_value(env)
             .unwrap_or(get_undefined(env).unwrap())
@@ -557,7 +559,11 @@ pub fn wrap<T>(env: NapiEnv, js_object: NapiValue, native_object: Box<T>) -> Res
 //     pub fn napi_unwrap(env: napi_env, js_object: napi_value,
 //                        result: *mut *mut ::std::os::raw::c_void)
 //      -> napi_status;
-
+pub fn unwrap<T>(env: NapiEnv, js_object: NapiValue) -> Result<Box<T>> {
+    let mut result = std::ptr::null_mut();
+    let status = unsafe { napi_unwrap(env, js_object, &mut result) };
+    napi_either(env, status, unsafe { Box::<T>::from_raw(result as *mut T) })
+}
 
 //     pub fn napi_create_external(env: napi_env,
 //                                 data: *mut ::std::os::raw::c_void,
