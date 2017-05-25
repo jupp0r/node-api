@@ -1,14 +1,16 @@
 #![feature(link_args)]
 
 extern crate node_api_sys;
+extern crate futures;
 
 mod napi;
 mod napi_value;
+mod napi_futures;
 
 pub use napi::{NapiValue, NapiError, NapiErrorType, NapiEnv, NapiModule, Result};
 pub use napi::{get_null, get_undefined, get_global, get_boolean, create_array, array_with_length,
                create_number, module_register, create_object, get_named_property,
-               set_named_property, create_function};
+               set_named_property, create_function, create_external};
 pub use napi_value::{FromNapiValues, ToNapiValue};
 
 #[macro_export]

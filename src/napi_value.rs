@@ -1,7 +1,9 @@
 use napi;
+use futures::future;
 
 use std::iter::Iterator;
 use napi::{Result, NapiError, NapiErrorType, NapiValueType};
+use napi_futures;
 
 pub trait FromNapiValues: Sized {
     fn from_napi_values(napi::NapiEnv, &[napi::NapiValue]) -> Result<Self>;
@@ -107,11 +109,11 @@ fn check_napi_type(env: napi::NapiEnv, expected_type: NapiValueType, value: napi
 }
 
 
-pub trait ToNapiValue {
-    fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue>;
+pub trait IntoNapiValue {
+    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue>;
 }
 
-impl ToNapiValue for () {
+impl IntoNapiValue for () {
     fn to_napi_value(&self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         napi::get_undefined(env)
     }
@@ -234,5 +236,21 @@ impl<T> ToNapiValue for Vec<T>
         };
 
         napi::array_with_length(env, self.len()).and_then(fill_array_with_values)
+    }
+}
+
+impl<T, E> ToNapiValue for future::BoxFuture<T, E>
+    where T: ToNapiValue,
+          E: ToNapiValue,
+{
+    fn to_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+        let obj = napi::create_object(env)?;
+        let b = self.clone();
+        napi::wrap::<Self>(env, obj, b.deref())?;
+        let then = napi::create_function(env, "then", |env, then_args: napi_futures::ThenArgs<T, E>| {
+
+        })?;
+        napi::set_named_property(env, obj, "then", then)?;
+        Ok(obj)
     }
 }

@@ -8,3 +8,4 @@ crate-type = ["lib"]
 
 [dependencies]
 node-api-sys = "0"
+futures = "0.1"

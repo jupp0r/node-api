@@ -1,22 +1,33 @@
 #![feature(link_args)]
 #[macro_use(napi_module)]
 extern crate node_api;
+extern crate futures;
+extern crate tokio_core;
 
 use node_api::{NapiEnv, NapiValue, FromNapiValues, ToNapiValue, NapiError, NapiErrorType};
-use node_api::{create_function, get_named_property, set_named_property, create_object};
+use node_api::{create_function, get_named_property, set_named_property, create_object,
+               create_external};
+
+use futures::future;
+use futures::Future;
+
+use tokio_core::reactor::Core;
 
 napi_module!("tests", register);
 
 #[no_mangle]
 pub extern "C" fn register(env: NapiEnv,
                            exports: NapiValue,
-                           _module: NapiValue,
+                           module: NapiValue,
                            _priv: *mut std::os::raw::c_void) {
+    // create_and_attach_event_loop(env, module);
+
     register_test(env, "returns_objects", exports, &returns_objects);
     register_test(env, "returns_strings", exports, &returns_strings);
     register_test(env, "returns_numbers", exports, &returns_numbers);
     register_test(env, "returns_booleans", exports, &returns_booleans);
     register_test(env, "returns_arrays", exports, &returns_arrays);
+
     register_test(env, "receives_objects", exports, &receives_objects);
     register_test(env, "receives_strings", exports, &receives_strings);
     register_test(env, "receives_booleans", exports, &receives_booleans);
@@ -24,7 +35,14 @@ pub extern "C" fn register(env: NapiEnv,
     register_test(env, "receives_u64", exports, &receives_u64);
     register_test(env, "receives_i64", exports, &receives_i64);
     register_test(env, "receives_arrays", exports, &receives_arrays);
+
+    register_test(env, "returns_promises", exports, &returns_promises);
 }
+
+// fn create_and_attach_event_loop(env: NapiEnv, module: NapiValue) {
+//    let core = Box::new(Core::new().unwrap());
+//    let core_js = node_api::create_external(env, core).unwrap();
+//}
 
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
     where F: Fn(NapiEnv, A) -> R,
@@ -139,4 +157,8 @@ fn receives_i64(_: NapiEnv, arg: i64) -> i64 {
 
 fn receives_arrays(_: NapiEnv, arg: Vec<String>) -> Vec<String> {
     arg
+}
+
+fn returns_promises(_: NapiEnv, _arg: ()) -> futures::BoxFuture<(), ()> {
+    future::ok(()).boxed()
 }

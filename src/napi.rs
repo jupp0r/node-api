@@ -5,8 +5,10 @@ use node_api_sys::*;
 
 use napi_value::{FromNapiValues, ToNapiValue};
 
-pub type NapiValue = napi_value;
 pub type NapiEnv = napi_env;
+pub type NapiRef = napi_ref;
+pub type NapiValue = napi_value;
+
 pub type Result<T> = std::result::Result<T, NapiError>;
 
 #[derive(Debug, Clone)]
@@ -124,7 +126,7 @@ fn make_generic_napi_error(message: &str) -> NapiError {
     }
 }
 
-fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
+pub fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
     match status {
         napi_status::napi_ok => Ok(val),
         _err => Err(get_last_napi_error(env).expect("error fetching last napi error")),
@@ -539,7 +541,18 @@ pub fn get_array_length(env: NapiEnv, value: NapiValue) -> Result<usize> {
 //                      finalize_cb: napi_finalize,
 //                      finalize_hint: *mut ::std::os::raw::c_void,
 //                      result: *mut napi_ref) -> napi_status;
-
+pub fn wrap<T>(env: NapiEnv, js_object: NapiValue, native_object: Box<T>) -> Result<NapiRef> {
+    let mut result: NapiRef = std::mem::uninitialized();
+    let status = unsafe {
+        napi_wrap(env,
+                  js_object,
+                  Box::into_raw(native_object) as *mut ::std::os::raw::c_void,
+                  Some(finalize_box::<T>),
+                  std::ptr::null_mut(),
+                  &mut result)
+    };
+    napi_either(env, status, result)
+}
 
 //     pub fn napi_unwrap(env: napi_env, js_object: napi_value,
 //                        result: *mut *mut ::std::os::raw::c_void)
@@ -551,7 +564,25 @@ pub fn get_array_length(env: NapiEnv, value: NapiValue) -> Result<usize> {
 //                                 finalize_cb: napi_finalize,
 //                                 finalize_hint: *mut ::std::os::raw::c_void,
 //                                 result: *mut napi_value) -> napi_status;
+pub fn create_external<T>(env: NapiEnv, t: Box<T>) -> Result<NapiValue> {
 
+    let mut result: NapiValue = 0;
+    let status = unsafe {
+        napi_create_external(env,
+                             Box::into_raw(t) as *mut ::std::os::raw::c_void,
+                             Some(finalize_box::<T>),
+                             std::ptr::null_mut(),
+                             &mut result)
+    };
+    napi_either(env, status, result)
+}
+
+unsafe extern "C" fn finalize_box<T>(_env: NapiEnv,
+                                     finalize_data: *mut ::std::os::raw::c_void,
+                                     _finalize_hint: *mut ::std::os::raw::c_void) {
+    // move ownership into transient box in order to handle Drop, etc
+    Box::from_raw(finalize_data as *mut T);
+}
 
 //     pub fn napi_get_value_external(env: napi_env, value: napi_value,
 //                                    result: *mut *mut ::std::os::raw::c_void)

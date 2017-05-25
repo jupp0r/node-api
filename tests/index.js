@@ -49,4 +49,11 @@ describe("node-api", function() {
             expect(nt.receives_arrays(arr)).to.deep.equal(arr);
         });
     });
+    describe("promises", function() {
+        it("returns a void promise", function(done) {
+            return nt.returns_promises().then(function() {
+                done();
+            });
+        });
+    });
 });
