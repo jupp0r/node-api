@@ -6,8 +6,8 @@ use napi_value::{IntoNapiValue, FromNapiValues};
 struct FutureContext {}
 
 pub struct ThenArgs<T, E> {
-    on_fulfilled: Box<FnOnce(NapiEnv, T)>,
-    on_rejected: Box<FnOnce(NapiEnv, E)>,
+    pub on_fulfilled: Box<FnOnce(NapiEnv, T)>,
+    pub on_rejected: Box<FnOnce(NapiEnv, E)>,
 }
 
 impl<T, E> FromNapiValues for ThenArgs<T, E> {

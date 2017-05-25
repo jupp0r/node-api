@@ -1,5 +1,6 @@
 use napi;
 use futures::future;
+use futures::future::Future;
 
 use napi::{Result, NapiError, NapiErrorType, NapiValueType};
 use napi_futures;
@@ -235,8 +236,14 @@ impl<T, E> IntoNapiValue for future::BoxFuture<T, E>
     fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         let obj = napi::create_object(env)?;
         napi::wrap(env, obj, Box::new(self))?;
-        let then = napi::create_function(env, "then", |env, then_args: napi_futures::ThenArgs<T, E>| {
-
+        let then = napi::create_function(env, "then", move |env, then_args: napi_futures::ThenArgs<T, E>| {
+            self.then(move |result| {
+                match result {
+                    Ok(val) => (then_args.on_fulfilled)(env, val),
+                    Err(err) => (then_args.on_rejected)(env, err)
+                }
+                future::result(Ok(()))
+            }).boxed()
         })?;
         napi::set_named_property(env, obj, "then", then)?;
         Ok(obj)
