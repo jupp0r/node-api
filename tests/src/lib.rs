@@ -4,7 +4,7 @@ extern crate node_api;
 extern crate futures;
 extern crate tokio_core;
 
-use node_api::{NapiEnv, NapiValue, FromNapiValues, ToNapiValue, NapiError, NapiErrorType};
+use node_api::{NapiEnv, NapiValue, FromNapiValues, IntoNapiValue, NapiError, NapiErrorType};
 use node_api::{create_function, get_named_property, set_named_property, create_object,
                create_external};
 
@@ -47,7 +47,7 @@ pub extern "C" fn register(env: NapiEnv,
 fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
     where F: Fn(NapiEnv, A) -> R,
           A: FromNapiValues,
-          R: ToNapiValue
+          R: IntoNapiValue
 {
     let test = create_function(env, name, f).unwrap();
     set_named_property(env, exports, name, test).unwrap();
@@ -67,11 +67,11 @@ struct Object {
     pub bar: u64,
 }
 
-impl ToNapiValue for Object {
-    fn to_napi_value(&self, env: NapiEnv) -> node_api::Result<NapiValue> {
+impl IntoNapiValue for Object {
+    fn into_napi_value(self, env: NapiEnv) -> node_api::Result<NapiValue> {
         let object = create_object(env)?;
-        let foo = self.foo.to_napi_value(env)?;
-        let bar = self.bar.to_napi_value(env)?;
+        let foo = self.foo.into_napi_value(env)?;
+        let bar = self.bar.into_napi_value(env)?;
         set_named_property(env, object, "foo", foo)?;
         set_named_property(env, object, "bar", bar)?;
         Ok(object)

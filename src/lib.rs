@@ -11,7 +11,7 @@ pub use napi::{NapiValue, NapiError, NapiErrorType, NapiEnv, NapiModule, Result}
 pub use napi::{get_null, get_undefined, get_global, get_boolean, create_array, array_with_length,
                create_number, module_register, create_object, get_named_property,
                set_named_property, create_function, create_external};
-pub use napi_value::{FromNapiValues, ToNapiValue};
+pub use napi_value::{FromNapiValues, IntoNapiValue};
 
 #[macro_export]
 macro_rules! napi_module {

@@ -1,7 +1,7 @@
 use std::boxed::Box;
 
 use napi::{NapiEnv, NapiValue, Result};
-use napi_value::{ToNapiValue, FromNapiValues};
+use napi_value::{IntoNapiValue, FromNapiValues};
 
 struct FutureContext {}
 

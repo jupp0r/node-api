@@ -3,7 +3,7 @@ use std::boxed::Box;
 use std::ffi::{CStr, CString};
 use node_api_sys::*;
 
-use napi_value::{FromNapiValues, ToNapiValue};
+use napi_value::{FromNapiValues, IntoNapiValue};
 
 pub type NapiEnv = napi_env;
 pub type NapiRef = napi_ref;
@@ -255,12 +255,12 @@ pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
 pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<NapiValue>
     where F: Fn(NapiEnv, T) -> R,
           T: FromNapiValues,
-          R: ToNapiValue
+          R: IntoNapiValue
 {
     unsafe extern "C" fn wrapper<F, T, R>(env: NapiEnv, cbinfo: napi_callback_info) -> NapiValue
         where F: Fn(NapiEnv, T) -> R,
               T: FromNapiValues,
-              R: ToNapiValue
+              R: IntoNapiValue
     {
         let mut argc: usize = 16;
         let mut argv: [NapiValue; 16] = std::mem::uninitialized();
@@ -280,7 +280,7 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
 
         let return_value = callback.expect("no callback found")(env, args);
         return_value
-            .to_napi_value(env)
+            .into_napi_value(env)
             .unwrap_or(get_undefined(env).unwrap())
     }
 
@@ -542,7 +542,7 @@ pub fn get_array_length(env: NapiEnv, value: NapiValue) -> Result<usize> {
 //                      finalize_hint: *mut ::std::os::raw::c_void,
 //                      result: *mut napi_ref) -> napi_status;
 pub fn wrap<T>(env: NapiEnv, js_object: NapiValue, native_object: Box<T>) -> Result<NapiRef> {
-    let mut result: NapiRef = std::mem::uninitialized();
+    let mut result: NapiRef = unsafe { std::mem::uninitialized() };
     let status = unsafe {
         napi_wrap(env,
                   js_object,
