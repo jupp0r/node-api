@@ -500,6 +500,17 @@ pub fn get_array_length(env: NapiEnv, value: NapiValue) -> Result<usize> {
 //                               func: napi_value, argc: usize,
 //                               argv: *const napi_value,
 //                               result: *mut napi_value) -> napi_status;
+pub fn call_function(env: NapiEnv,
+                     recv: NapiValue,
+                     func: NapiValue,
+                     args: &[NapiValue])
+                     -> Result<NapiValue> {
+    let mut result: NapiValue = 0;
+    let status =
+        unsafe { napi_call_function(env, recv, func, args.len(), args.as_ptr(), &mut result) };
+    napi_either(env, status, result)
+}
+
 
 
 //     pub fn napi_new_instance(env: napi_env, constructor: napi_value,
@@ -593,6 +604,11 @@ unsafe extern "C" fn finalize_box<T>(_env: NapiEnv,
 //     pub fn napi_get_value_external(env: napi_env, value: napi_value,
 //                                    result: *mut *mut ::std::os::raw::c_void)
 //      -> napi_status;
+pub fn get_value_external<T>(env: NapiEnv, value: NapiValue) -> Result<Box<T>> {
+    let mut result = std::ptr::null_mut();
+    let status = unsafe { napi_get_value_external(env, value, &mut result) };
+    napi_either(env, status, unsafe { Box::<T>::from_raw(result as *mut T) })
+}
 
 
 //     pub fn napi_create_reference(env: napi_env, value: napi_value,

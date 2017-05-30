@@ -235,19 +235,20 @@ impl<T, E> IntoNapiValue for future::BoxFuture<T, E>
 {
     fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         let obj = napi::create_object(env)?;
-        napi::wrap(env, obj, Box::new(self))?;
-        let then = napi::create_function(env, "then", |env, this, then_args: napi_futures::ThenArgs<T, E>| {
-            // todo @juppm: remove unwrap
-            let future: Box<future::BoxFuture<T,E>> = napi::unwrap(env, this).unwrap();
+        let state = napi::create_external(env, Box::new(self))?;
+        let then = napi::create_function(env, "then", move |env, this, then_args: napi_futures::ThenArgs<T, E>| {
+            let state = napi::get_named_property(env, this, "state").unwrap();
+            let future: Box<future::BoxFuture<T,E>> = napi::get_value_external(env, state).unwrap();
             future.then(move |result| {
                 match result {
-                    Ok(val) => (then_args.on_fulfilled)(env, val),
-                    Err(err) => (then_args.on_rejected)(env, err)
+                    Ok(val) => (then_args.on_fulfilled)(env, this, val),
+                    Err(err) => (then_args.on_rejected)(env, this, err)
                 }
                 future::result::<(),()>(Ok(())).boxed()
-            }).boxed()
+            }).boxed().wait().unwrap();
         })?;
         napi::set_named_property(env, obj, "then", then)?;
+        napi::set_named_property(env, obj, "state", state)?;
         Ok(obj)
     }
 }
