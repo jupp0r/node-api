@@ -2,7 +2,8 @@ use napi;
 use futures::future;
 use futures::future::Future;
 
-use napi::{Result, NapiError, NapiErrorType, NapiValueType};
+use napi::NapiValueType;
+use error::{Result, NapiError, NapiErrorType};
 use napi_futures;
 
 pub trait FromNapiValues: Sized {

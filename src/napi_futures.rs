@@ -1,13 +1,15 @@
 use std::boxed::Box;
 
-use napi::{NapiEnv, NapiValue, Result, call_function};
+use napi::{NapiEnv, NapiValue, call_function};
 use napi_value::{IntoNapiValue, FromNapiValues};
+use error::Result;
 
 pub struct ThenArgs<T, E> {
     pub on_fulfilled: Box<Fn(NapiEnv, NapiValue, T) + Send>,
     pub on_rejected: Box<Fn(NapiEnv, NapiValue, E) + Send>,
 }
 
+#[allow(unused_variables, unused_must_use)]
 impl<T, E> FromNapiValues for ThenArgs<T, E>
     where T: IntoNapiValue
 {
