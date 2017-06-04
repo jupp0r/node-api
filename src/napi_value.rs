@@ -6,58 +6,42 @@ use napi::NapiValueType;
 use error::{Result, NapiError, NapiErrorType};
 use napi_futures;
 
+pub trait FromNapiValue: Sized {
+    fn from_napi_values(napi::NapiEnv, napi::NapiValue) -> Result<Self>;
+}
+
 pub trait FromNapiValues: Sized {
     fn from_napi_values(napi::NapiEnv, napi::NapiValue, &[napi::NapiValue]) -> Result<Self>;
+}
+
+
+macro_rules! impl_from_napi_values {
+    ($t:ty, $from:expr, $get_value:expr) => {
+        impl FromNapiValues for $t {
+            fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<$t> {
+                check_napi_args_length(env, napi_values, 1)?;
+                let value = napi_values[0];
+                check_napi_type(env, $from, value)?;
+                $get_value(env, value)
+            }
+        }
+    }
+}
+
+impl_from_napi_values!(String, NapiValueType::String, napi::get_value_string_utf8);
+impl_from_napi_values!(i64, NapiValueType::Number, napi::get_value_int64);
+impl_from_napi_values!(u64, NapiValueType::Number, get_value_uint64);
+impl_from_napi_values!(bool, NapiValueType::Boolean, napi::get_value_bool);
+impl_from_napi_values!(f64, NapiValueType::Number, napi::get_value_double);
+
+
+fn get_value_uint64(env: napi::NapiEnv, value: napi::NapiValue) -> Result<u64> {
+    napi::get_value_uint32(env, value).map(|x| x as u64)
 }
 
 impl FromNapiValues for () {
     fn from_napi_values(_: napi::NapiEnv, _: napi::NapiValue, _: &[napi::NapiValue]) -> Result<Self> {
         Ok(())
-    }
-}
-
-impl FromNapiValues for u64 {
-    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
-        check_napi_args_length(env, napi_values, 1)?;
-        let value = napi_values[0];
-        check_napi_type(env, NapiValueType::Number, value)?;
-        napi::get_value_uint32(env, value).map(|x| x as u64)
-    }
-}
-
-impl FromNapiValues for i64 {
-    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
-        check_napi_args_length(env, napi_values, 1)?;
-        let value = napi_values[0];
-        check_napi_type(env, NapiValueType::Number, value)?;
-        napi::get_value_int64(env, value)
-    }
-}
-
-impl FromNapiValues for String {
-    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
-        check_napi_args_length(env, napi_values, 1)?;
-        let value = napi_values[0];
-        check_napi_type(env, NapiValueType::String, value)?;
-        napi::get_value_string_utf8(env, value)
-    }
-}
-
-impl FromNapiValues for bool {
-    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
-        check_napi_args_length(env, napi_values, 1)?;
-        let value = napi_values[0];
-        check_napi_type(env, NapiValueType::Boolean, value)?;
-        napi::get_value_bool(env, value)
-    }
-}
-
-impl FromNapiValues for f64 {
-    fn from_napi_values(env: napi::NapiEnv, _: napi::NapiValue, napi_values: &[napi::NapiValue]) -> Result<Self> {
-        check_napi_args_length(env, napi_values, 1)?;
-        let value = napi_values[0];
-        check_napi_type(env, NapiValueType::Number, value)?;
-        napi::get_value_double(env, value)
     }
 }
 
@@ -114,17 +98,18 @@ pub trait IntoNapiValue {
     fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue>;
 }
 
-impl IntoNapiValue for () {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::get_undefined(env)
+macro_rules! impl_into_napi_values {
+    ($t:ty, $get_value:expr) => {
+        impl IntoNapiValue for $t {
+            fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
+                $get_value(env, self)
+            }
+        }
     }
 }
 
-impl IntoNapiValue for String {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_string_utf8(env, self)
-    }
-}
+impl_into_napi_values!((), |env, _| napi::get_undefined(env));
+impl_into_napi_values!(String, napi::create_string_utf8);
 
 impl<'a> IntoNapiValue for &'a str {
     fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
@@ -132,71 +117,21 @@ impl<'a> IntoNapiValue for &'a str {
     }
 }
 
-impl IntoNapiValue for u8 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
+impl_into_napi_values!(u8, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(u16, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(u32, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(u64, |env, s| napi::create_number(env, s as f64));
 
-impl IntoNapiValue for u16 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
+impl_into_napi_values!(i8, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(i16, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(i32, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(i64, |env, s| napi::create_number(env, s as f64));
 
-impl IntoNapiValue for u32 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
+impl_into_napi_values!(f32, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(f64, |env, s| napi::create_number(env, s as f64));
 
-impl IntoNapiValue for u64 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
+impl_into_napi_values!(bool,  napi::get_boolean);
 
-impl IntoNapiValue for i8 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
-
-impl IntoNapiValue for i16 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
-
-impl IntoNapiValue for i32 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
-
-impl IntoNapiValue for i64 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
-
-impl IntoNapiValue for f32 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
-
-impl IntoNapiValue for f64 {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::create_number(env, self as f64)
-    }
-}
-
-impl IntoNapiValue for bool {
-    fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
-        napi::get_boolean(env, self)
-    }
-}
 
 impl<'a, T> IntoNapiValue for &'a [T]
     where T: IntoNapiValue + Clone
