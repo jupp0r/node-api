@@ -31,6 +31,7 @@ struct HelloReturn {
     pub foo: String,
     pub bar: u64,
 }
+
 impl IntoNapiValue for HelloReturn {
     fn into_napi_value(self, env: NapiEnv) -> Result<NapiValue> {
         let object = create_object(env)?;
@@ -40,10 +41,4 @@ impl IntoNapiValue for HelloReturn {
         set_named_property(env, object, "bar", bar)?;
         Ok(object)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
 }
