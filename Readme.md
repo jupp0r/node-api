@@ -27,6 +27,9 @@ Unfortunately, that's what most binding generators focus on. This
 crate uses [futures-rs](https://github.com/alexcrichton/futures-rs) to
 make writing asynchronous modules for compute or IO tasks much easier.
 
+## Usage
+This is a [cargo workspace](https://rust-lang.github.io/book/second-edition/ch14-03-cargo-workspaces.html). Simply run `cargo build --all`
+
 ## Status
 pre-alpha, some parts work in a proof-of-concept way, but the crate cannot be consumed yet.
 

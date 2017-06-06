@@ -1,15 +1,14 @@
-use std;
-use std::boxed::Box;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
+use std::{ptr,mem,f64,usize,os};
+use std::result::Result as StdResult;
 use node_api_sys::*;
 
 use napi_value::{FromNapiValues, IntoNapiValue};
+use error::*;
 
 pub type NapiEnv = napi_env;
 pub type NapiRef = napi_ref;
 pub type NapiValue = napi_value;
-
-pub type Result<T> = std::result::Result<T, NapiError>;
 
 #[derive(Debug, Clone)]
 pub struct NapiModule {
@@ -20,74 +19,6 @@ pub struct NapiModule {
     pub modname: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct NapiError {
-    pub error_message: String,
-    pub engine_error_code: u32,
-    pub error_code: NapiErrorType,
-}
-
-impl From<napi_extended_error_info> for NapiError {
-    fn from(error: napi_extended_error_info) -> Self {
-        unsafe {
-            Self {
-                error_message: CStr::from_ptr(error.error_message)
-                    .to_string_lossy()
-                    .into_owned(),
-                engine_error_code: error.engine_error_code,
-                error_code: NapiErrorType::from(error.error_code),
-            }
-        }
-    }
-}
-
-impl From<std::ffi::NulError> for NapiError {
-    fn from(_: std::ffi::NulError) -> Self {
-        make_generic_napi_error("string must not contain 0 byte")
-    }
-}
-
-impl From<std::string::FromUtf8Error> for NapiError {
-    fn from(err: std::string::FromUtf8Error) -> Self {
-        make_generic_napi_error(&format!("{:?}", err))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum NapiErrorType {
-    InvalidArg,
-    ObjectExpected,
-    StringExpected,
-    NameExpected,
-    FunctionExpected,
-    NumberExpected,
-    BooleanExpected,
-    ArrayExpected,
-    GenericFailure,
-    PendingException,
-    Cancelled,
-    StatusLast,
-}
-
-impl From<napi_status> for NapiErrorType {
-    fn from(s: napi_status) -> Self {
-        match s {
-            napi_status::napi_invalid_arg => NapiErrorType::InvalidArg,
-            napi_status::napi_object_expected => NapiErrorType::ObjectExpected,
-            napi_status::napi_string_expected => NapiErrorType::StringExpected,
-            napi_status::napi_name_expected => NapiErrorType::NameExpected,
-            napi_status::napi_function_expected => NapiErrorType::FunctionExpected,
-            napi_status::napi_number_expected => NapiErrorType::NumberExpected,
-            napi_status::napi_boolean_expected => NapiErrorType::BooleanExpected,
-            napi_status::napi_array_expected => NapiErrorType::ArrayExpected,
-            napi_status::napi_generic_failure => NapiErrorType::GenericFailure,
-            napi_status::napi_pending_exception => NapiErrorType::PendingException,
-            napi_status::napi_cancelled => NapiErrorType::Cancelled,
-            napi_status::napi_status_last => NapiErrorType::StatusLast,
-            _ => NapiErrorType::GenericFailure,
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NapiValueType {
@@ -118,14 +49,6 @@ impl From<napi_valuetype> for NapiValueType {
     }
 }
 
-fn make_generic_napi_error(message: &str) -> NapiError {
-    NapiError {
-        error_message: message.to_string(),
-        engine_error_code: 0,
-        error_code: NapiErrorType::GenericFailure,
-    }
-}
-
 pub fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
     match status {
         napi_status::napi_ok => Ok(val),
@@ -133,11 +56,10 @@ pub fn napi_either<T>(env: NapiEnv, status: napi_status, val: T) -> Result<T> {
     }
 }
 
-fn get_last_error_info(env: napi_env)
-                       -> std::result::Result<napi_extended_error_info, napi_status> {
+fn get_last_error_info(env: napi_env) -> StdResult<napi_extended_error_info, napi_status> {
     unsafe {
         let mut info: *const napi_extended_error_info =
-            Box::into_raw(Box::new(std::mem::uninitialized()));
+            Box::into_raw(Box::new(mem::uninitialized()));
         let status = napi_get_last_error_info(env, &mut info);
         match status {
             napi_status::napi_ok => Ok(*info),
@@ -146,24 +68,24 @@ fn get_last_error_info(env: napi_env)
     }
 }
 
-fn get_last_napi_error(env: NapiEnv) -> std::result::Result<NapiError, NapiErrorType> {
+fn get_last_napi_error(env: NapiEnv) -> StdResult<NapiError, NapiErrorType> {
     get_last_error_info(env)
         .map(|res| NapiError::from(res))
         .map_err(|err| NapiErrorType::from(err))
 }
 
-pub fn module_register(mod_: NapiModule) -> std::result::Result<(), NapiError> {
+pub fn module_register(mod_: NapiModule) -> StdResult<(), NapiError> {
     let module = &mut napi_module {
                           nm_version: mod_.version,
                           nm_flags: mod_.flags,
                           nm_filename: CString::new(mod_.filename)?.as_ptr(),
                           nm_register_func: mod_.register_func,
                           nm_modname: try!(CString::new(mod_.modname)).as_ptr(),
-                          nm_priv: std::ptr::null_mut(),
-                          reserved: [std::ptr::null_mut(),
-                                     std::ptr::null_mut(),
-                                     std::ptr::null_mut(),
-                                     std::ptr::null_mut()],
+                          nm_priv: ptr::null_mut(),
+                          reserved: [ptr::null_mut(),
+                                     ptr::null_mut(),
+                                     ptr::null_mut(),
+                                     ptr::null_mut()],
                       };
     unsafe {
         napi_module_register(module);
@@ -173,7 +95,7 @@ pub fn module_register(mod_: NapiModule) -> std::result::Result<(), NapiError> {
 
 pub fn get_undefined(env: NapiEnv) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_get_undefined(env, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -181,7 +103,7 @@ pub fn get_undefined(env: NapiEnv) -> Result<NapiValue> {
 
 pub fn get_null(env: NapiEnv) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_get_null(env, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -189,7 +111,7 @@ pub fn get_null(env: NapiEnv) -> Result<NapiValue> {
 
 pub fn get_global(env: NapiEnv) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_get_global(env, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -197,7 +119,7 @@ pub fn get_global(env: NapiEnv) -> Result<NapiValue> {
 
 pub fn get_boolean(env: NapiEnv, value: bool) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_get_boolean(env, value, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -205,7 +127,7 @@ pub fn get_boolean(env: NapiEnv, value: bool) -> Result<NapiValue> {
 
 pub fn create_object(env: NapiEnv) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_create_object(env, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -213,7 +135,7 @@ pub fn create_object(env: NapiEnv) -> Result<NapiValue> {
 
 pub fn create_array(env: NapiEnv) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_create_array(env, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -221,7 +143,7 @@ pub fn create_array(env: NapiEnv) -> Result<NapiValue> {
 
 pub fn array_with_length(env: NapiEnv, size: usize) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_create_array_with_length(env, size, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -229,7 +151,7 @@ pub fn array_with_length(env: NapiEnv, size: usize) -> Result<NapiValue> {
 
 pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
     unsafe {
-        let mut napi_val: NapiValue = std::mem::uninitialized();
+        let mut napi_val: NapiValue = mem::uninitialized();
         let status = napi_create_number(env, value, &mut napi_val);
         napi_either(env, status, napi_val)
     }
@@ -243,7 +165,7 @@ pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
     let status = unsafe {
         napi_create_string_utf8(env,
                                 converted_value.as_ptr(),
-                                std::usize::MAX, // indicates 0-terminated string
+                                usize::MAX, // indicates 0-terminated string
                                 &mut napi_val)
     };
     napi_either(env, status, napi_val)
@@ -263,8 +185,8 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
               R: IntoNapiValue
     {
         let mut argc: usize = 16;
-        let mut argv: [NapiValue; 16] = std::mem::uninitialized();
-        let mut user_data = std::ptr::null_mut();
+        let mut argv: [NapiValue; 16] = mem::uninitialized();
+        let mut user_data = ptr::null_mut();
         let mut this: NapiValue = 0;
         let status = napi_get_cb_info(env,
                                       cbinfo,
@@ -273,7 +195,7 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
                                       &mut this,
                                       &mut user_data);
         assert!(status == napi_status::napi_ok);
-        assert!(user_data != std::ptr::null_mut());
+        assert!(user_data != ptr::null_mut());
 
         let args =
             T::from_napi_values(env, this, &argv[0..argc]).expect("cannot convert arguments");
@@ -287,7 +209,7 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
     }
 
     let boxed_f = Box::new(Some(f));
-    let user_data = Box::into_raw(boxed_f) as *mut std::os::raw::c_void;
+    let user_data = Box::into_raw(boxed_f) as *mut os::raw::c_void;
     let mut napi_val: NapiValue = 0;
     let name = CString::new(utf8name)?;
     let status = unsafe {
@@ -320,7 +242,7 @@ pub fn type_of(env: NapiEnv, napi_value: NapiValue) -> Result<NapiValueType> {
 }
 
 pub fn get_value_double(env: NapiEnv, value: NapiValue) -> Result<f64> {
-    let mut result: f64 = std::f64::NAN;
+    let mut result: f64 = f64::NAN;
     let status = unsafe { napi_get_value_double(env, value, &mut result) };
     napi_either(env, status, result)
 }
@@ -359,7 +281,7 @@ pub fn get_value_string_utf8(env: NapiEnv, value: NapiValue) -> Result<String> {
     let mut size: usize = 0;
     // obtain string length in bytes to determine buffer size
     let size_status =
-        unsafe { napi_get_value_string_utf8(env, value, std::ptr::null_mut(), 0, &mut size) };
+        unsafe { napi_get_value_string_utf8(env, value, ptr::null_mut(), 0, &mut size) };
     napi_either(env, size_status, size)?;
     let mut buffer: Vec<u8> = Vec::with_capacity(size + 1);
     let mut written: usize = 0;
@@ -555,13 +477,13 @@ pub fn call_function(env: NapiEnv,
 //                      finalize_hint: *mut ::std::os::raw::c_void,
 //                      result: *mut napi_ref) -> napi_status;
 pub fn wrap<T>(env: NapiEnv, js_object: NapiValue, native_object: Box<T>) -> Result<NapiRef> {
-    let mut result: NapiRef = unsafe { std::mem::uninitialized() };
+    let mut result: NapiRef = unsafe { mem::uninitialized() };
     let status = unsafe {
         napi_wrap(env,
                   js_object,
                   Box::into_raw(native_object) as *mut ::std::os::raw::c_void,
                   Some(finalize_box::<T>),
-                  std::ptr::null_mut(),
+                  ptr::null_mut(),
                   &mut result)
     };
     napi_either(env, status, result)
@@ -571,7 +493,7 @@ pub fn wrap<T>(env: NapiEnv, js_object: NapiValue, native_object: Box<T>) -> Res
 //                        result: *mut *mut ::std::os::raw::c_void)
 //      -> napi_status;
 pub fn unwrap<T>(env: NapiEnv, js_object: NapiValue) -> Result<Box<T>> {
-    let mut result = std::ptr::null_mut();
+    let mut result = ptr::null_mut();
     let status = unsafe { napi_unwrap(env, js_object, &mut result) };
     napi_either(env, status, unsafe { Box::<T>::from_raw(result as *mut T) })
 }
@@ -588,7 +510,7 @@ pub fn create_external<T>(env: NapiEnv, t: Box<T>) -> Result<NapiValue> {
         napi_create_external(env,
                              Box::into_raw(t) as *mut ::std::os::raw::c_void,
                              Some(finalize_box::<T>),
-                             std::ptr::null_mut(),
+                             ptr::null_mut(),
                              &mut result)
     };
     napi_either(env, status, result)
@@ -605,7 +527,7 @@ unsafe extern "C" fn finalize_box<T>(_env: NapiEnv,
 //                                    result: *mut *mut ::std::os::raw::c_void)
 //      -> napi_status;
 pub fn get_value_external<T>(env: NapiEnv, value: NapiValue) -> Result<Box<T>> {
-    let mut result = std::ptr::null_mut();
+    let mut result = ptr::null_mut();
     let status = unsafe { napi_get_value_external(env, value, &mut result) };
     napi_either(env, status, unsafe { Box::<T>::from_raw(result as *mut T) })
 }

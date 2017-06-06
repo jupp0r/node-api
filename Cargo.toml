@@ -7,5 +7,12 @@ authors = ["Jupp Müller <jupp0r@gmail.com>"]
 crate-type = ["lib"]
 
 [dependencies]
-node-api-sys = "0"
+node-api-sys = {path = "./node-api-sys"}
 futures = "0.1"
+
+[workspace]
+members = [
+    "examples/hello-world",
+    "node-api-sys",
+    "tests",
+]

@@ -4,7 +4,8 @@ extern crate node_api;
 extern crate futures;
 extern crate tokio_core;
 
-use node_api::{NapiEnv, NapiValue, FromNapiValues, IntoNapiValue, NapiError, NapiErrorType};
+use node_api::{NapiEnv, NapiValue, FromNapiValues, IntoNapiValue};
+use node_api::error::*;
 use node_api::{create_function, get_named_property, set_named_property, create_object,
                create_external};
 
@@ -68,7 +69,7 @@ struct Object {
 }
 
 impl IntoNapiValue for Object {
-    fn into_napi_value(self, env: NapiEnv) -> node_api::Result<NapiValue> {
+    fn into_napi_value(self, env: NapiEnv) -> Result<NapiValue> {
         let object = create_object(env)?;
         let foo = self.foo.into_napi_value(env)?;
         let bar = self.bar.into_napi_value(env)?;
@@ -82,7 +83,7 @@ impl FromNapiValues for Object {
     fn from_napi_values(env: NapiEnv,
                         this: NapiValue,
                         napi_values: &[NapiValue])
-                        -> node_api::Result<Object> {
+                        -> Result<Object> {
         match napi_values.len() {
             1 => {
                 let object = napi_values[0];
@@ -113,7 +114,7 @@ impl FromNapiValues for ReceivesObjectsArgs {
     fn from_napi_values(env: NapiEnv,
                         this: NapiValue,
                         napi_values: &[NapiValue])
-                        -> node_api::Result<ReceivesObjectsArgs> {
+                        -> Result<ReceivesObjectsArgs> {
         let arg0 = Object::from_napi_values(env, this, napi_values)?;
         Ok(ReceivesObjectsArgs { arg0: arg0 })
     }

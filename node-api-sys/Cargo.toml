@@ -1,0 +1,9 @@
+[package]
+name = "node-api-sys"
+version = "0.1.1"
+authors = ["Jupp Müller <jupp0r@gmail.com>"]
+license = "MIT"
+description = "Bindings for nodejs NAPI"
+homepage = "https://github.com/jupp0r/node-api-sys"
+
+[dependencies]
