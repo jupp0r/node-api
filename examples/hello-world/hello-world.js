@@ -1,1 +1,0 @@
-import * as hello_world from "./target/"
