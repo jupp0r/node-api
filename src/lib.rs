@@ -7,6 +7,7 @@ mod napi;
 mod napi_value;
 mod napi_futures;
 pub mod error;
+mod executor;
 
 pub use napi::*;
 pub use napi_value::{FromNapiValues, IntoNapiValue};

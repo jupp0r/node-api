@@ -14,14 +14,17 @@ impl<T, E> FromNapiValues for ThenArgs<T, E>
     where T: IntoNapiValue
 {
     fn from_napi_values(env: NapiEnv, this: NapiValue, values: &[NapiValue]) -> Result<Self> {
+        println!("ThenArgs::from_napi_values");
         let fulfilled_function = values[0].clone();
         Ok(ThenArgs {
                on_fulfilled: Box::new(move |env, this, args| {
+                                          println!("on_fulfilled");
                                           let napi_args = [args.into_napi_value(env).unwrap()];
+                                          println!("calling_function");
                                           call_function(env, this, fulfilled_function, &napi_args);
                                       }),
                on_rejected: Box::new(|_, _, _| {
-                                         println!("onrejected called");
+                                         println!("on_rejected");
                                      }),
            })
     }

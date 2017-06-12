@@ -53,6 +53,7 @@ describe("node-api", function() {
         it("returns a void promise", function(done) {
             const p = nt.returns_promises();
             p.then(function() {
+                console.log("then called in js");
                 done();
             });
         });

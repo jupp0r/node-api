@@ -427,9 +427,11 @@ pub fn call_function(env: NapiEnv,
                      func: NapiValue,
                      args: &[NapiValue])
                      -> Result<NapiValue> {
+    println!("call_function with {} parameters", args.len());
     let mut result: NapiValue = 0;
     let status =
         unsafe { napi_call_function(env, recv, func, args.len(), args.as_ptr(), &mut result) };
+    println!("called");
     napi_either(env, status, result)
 }
 
@@ -683,22 +685,97 @@ pub fn get_value_external<T>(env: NapiEnv, value: NapiValue) -> Result<Box<T>> {
 //                                     arraybuffer: *mut napi_value,
 //                                     byte_offset: *mut usize) -> napi_status;
 
+pub struct NapiAsyncWork {
+    work: napi_async_work,
+}
 
-//     pub fn napi_create_async_work(env: napi_env,
-//                                   execute: napi_async_execute_callback,
-//                                   complete: napi_async_complete_callback,
-//                                   data: *mut ::std::os::raw::c_void,
-//                                   result: *mut napi_async_work)
-//      -> napi_status;
+// pub fn napi_create_async_work(env: napi_env,
+//                               execute: napi_async_execute_callback,
+//                               complete: napi_async_complete_callback,
+//                               data: *mut ::std::os::raw::c_void,
+//                               result: *mut napi_async_work)
+//                               -> napi_status;
+// pub type napi_async_execute_callback =
+//     ::std::option::Option<unsafe extern "C" fn(env: napi_env,
+//                                                data:
+//                                                *mut ::std::os::raw::c_void)>;
+// pub type napi_async_complete_callback =
+//     ::std::option::Option<unsafe extern "C" fn(env: napi_env,
+//                                                status: napi_status,
+//                                                data:
+//                                                *mut ::std::os::raw::c_void)>;
 
+struct AsyncWorkCallbackContainer<E, C>
+    where E: FnOnce(NapiEnv) + 'static + Send,
+          C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+{
+    pub execute: E,
+    pub complete: C,
+}
+
+pub fn create_async_work<F, C>(env: NapiEnv, execute: F, complete: C) -> Result<NapiAsyncWork>
+    where F: FnOnce(NapiEnv) + 'static + Send,
+          C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+{
+    println!("create_async_work");
+    unsafe extern "C" fn wrap_execute<F, C>(env: NapiEnv, data: *mut ::std::os::raw::c_void)
+        where F: FnOnce(NapiEnv) + 'static + Send,
+              C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+    {
+        println!("wrap_execute");
+        let mut callbacks = Box::from_raw(data as *mut AsyncWorkCallbackContainer<F, C>);
+        (callbacks.execute)(env);
+    }
+
+    unsafe extern "C" fn wrap_complete<F, C>(env: NapiEnv,
+                                             status: napi_status,
+                                             data: *mut ::std::os::raw::c_void)
+        where F: FnOnce(NapiEnv) + 'static + Send,
+              C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+    {
+        println!("wrap_complete");
+        let mut callbacks = Box::from_raw(data as *mut AsyncWorkCallbackContainer<F, C>);
+        let result = match status {
+            napi_status::napi_ok => Ok(()),
+            _ => Err(NapiErrorType::from(status)),
+        };
+        (callbacks.complete)(env, result);
+    }
+
+    let data = Box::new(AsyncWorkCallbackContainer {
+                            execute: execute,
+                            complete: complete,
+                        });
+
+    let mut result: napi_async_work = std::ptr::null_mut();
+    let status = unsafe {
+        napi_create_async_work(env,
+                               Some(wrap_execute::<F, C>),
+                               Some(wrap_complete::<F, C>),
+                               Box::into_raw(data) as *mut ::std::os::raw::c_void,
+                               &mut result)
+    };
+    napi_either(env, status, NapiAsyncWork { work: result })
+}
 
 //     pub fn napi_delete_async_work(env: napi_env, work: napi_async_work)
 //      -> napi_status;
-
+pub fn delete_async_work(env: NapiEnv, work: NapiAsyncWork) -> Result<()> {
+    let status = unsafe { napi_delete_async_work(env, work.work) };
+    napi_either(env, status, ())
+}
 
 //     pub fn napi_queue_async_work(env: napi_env, work: napi_async_work)
 //      -> napi_status;
-
+pub fn queue_async_work(env: NapiEnv, work: NapiAsyncWork) -> Result<()> {
+    println!("queue_async_work");
+    let status = unsafe { napi_queue_async_work(env, work.work) };
+    napi_either(env, status, ())
+}
 
 //     pub fn napi_cancel_async_work(env: napi_env, work: napi_async_work)
 //      -> napi_status;
+pub fn cancel_async_work(env: NapiEnv, work: NapiAsyncWork) -> Result<()> {
+    let status = unsafe { napi_cancel_async_work(env, work.work) };
+    napi_either(env, status, ())
+}

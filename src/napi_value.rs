@@ -1,4 +1,5 @@
 use napi;
+use executor;
 use futures::future;
 use futures::future::Future;
 
@@ -166,22 +167,25 @@ impl<T> IntoNapiValue for Vec<T>
 }
 
 impl<T, E> IntoNapiValue for future::BoxFuture<T, E>
-    where T: IntoNapiValue + 'static,
-          E: IntoNapiValue + 'static,
+    where T: IntoNapiValue + 'static + Send,
+          E: IntoNapiValue + 'static + Send,
 {
     fn into_napi_value(self, env: napi::NapiEnv) -> Result<napi::NapiValue> {
         let obj = napi::create_object(env)?;
         let state = napi::create_external(env, Box::new(self))?;
         let then = napi::create_function(env, "then", move |env, this, then_args: napi_futures::ThenArgs<T, E>| {
+            println!("then");
             let state = napi::get_named_property(env, this, "state").unwrap();
-            let future: Box<future::BoxFuture<T,E>> = napi::get_value_external(env, state).unwrap();
-            future.then(move |result| {
+            let recovered_future: Box<future::BoxFuture<T,E>> = napi::get_value_external(env, state).unwrap();
+            let future = recovered_future.then(move |result| {
+                println!("spawned_then");
                 match result {
                     Ok(val) => (then_args.on_fulfilled)(env, this, val),
                     Err(err) => (then_args.on_rejected)(env, this, err)
-                }
+                };
                 future::result::<(),()>(Ok(())).boxed()
-            }).boxed().wait().unwrap();
+            }).boxed();
+            executor::spawn_fn(env, || { println!("spawned_future"); future.wait() }).boxed()
         })?;
         napi::set_named_property(env, obj, "then", then)?;
         napi::set_named_property(env, obj, "state", state)?;
