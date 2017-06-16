@@ -2,7 +2,8 @@ use std;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use futures::{Async, Poll};
 use futures::future::{BoxFuture, Future, IntoFuture, ok};
-use napi::{NapiEnv, Result, create_async_work, delete_async_work, queue_async_work};
+use napi::{NapiEnv, create_async_work, delete_async_work, queue_async_work};
+use error::Result;
 
 pub struct NapiFuture<T, E> {
     receiver: Receiver<std::result::Result<T, E>>,

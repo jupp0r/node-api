@@ -1,5 +1,5 @@
 use std::ffi::CString;
-use std::{ptr,mem,f64,usize,os};
+use std::{ptr, mem, f64, usize, os};
 use std::result::Result as StdResult;
 use node_api_sys::*;
 
@@ -707,7 +707,7 @@ pub struct NapiAsyncWork {
 
 struct AsyncWorkCallbackContainer<E, C>
     where E: FnOnce(NapiEnv) + 'static + Send,
-          C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+          C: FnOnce(NapiEnv, StdResult<(), NapiErrorType>) + 'static + Send
 {
     pub execute: E,
     pub complete: C,
@@ -715,12 +715,12 @@ struct AsyncWorkCallbackContainer<E, C>
 
 pub fn create_async_work<F, C>(env: NapiEnv, execute: F, complete: C) -> Result<NapiAsyncWork>
     where F: FnOnce(NapiEnv) + 'static + Send,
-          C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+          C: FnOnce(NapiEnv, StdResult<(), NapiErrorType>) + 'static + Send
 {
     println!("create_async_work");
     unsafe extern "C" fn wrap_execute<F, C>(env: NapiEnv, data: *mut ::std::os::raw::c_void)
         where F: FnOnce(NapiEnv) + 'static + Send,
-              C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+              C: FnOnce(NapiEnv, StdResult<(), NapiErrorType>) + 'static + Send
     {
         println!("wrap_execute");
         let mut callbacks = Box::from_raw(data as *mut AsyncWorkCallbackContainer<F, C>);
@@ -731,7 +731,7 @@ pub fn create_async_work<F, C>(env: NapiEnv, execute: F, complete: C) -> Result<
                                              status: napi_status,
                                              data: *mut ::std::os::raw::c_void)
         where F: FnOnce(NapiEnv) + 'static + Send,
-              C: FnOnce(NapiEnv, std::result::Result<(), NapiErrorType>) + 'static + Send
+              C: FnOnce(NapiEnv, StdResult<(), NapiErrorType>) + 'static + Send
     {
         println!("wrap_complete");
         let mut callbacks = Box::from_raw(data as *mut AsyncWorkCallbackContainer<F, C>);
@@ -747,7 +747,7 @@ pub fn create_async_work<F, C>(env: NapiEnv, execute: F, complete: C) -> Result<
                             complete: complete,
                         });
 
-    let mut result: napi_async_work = std::ptr::null_mut();
+    let mut result: napi_async_work = ptr::null_mut();
     let status = unsafe {
         napi_create_async_work(env,
                                Some(wrap_execute::<F, C>),
