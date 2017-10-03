@@ -1,0 +1,12 @@
+[package]
+name = "node-api"
+version = "0.1.0"
+authors = ["Jupp Müller <jupp0r@gmail.com>"]
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+node-api-sys = {path = "../node-api-sys"}
+futures = "0.1"
+

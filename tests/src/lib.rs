@@ -6,8 +6,13 @@ extern crate tokio_core;
 
 use node_api::{NapiEnv, NapiValue, FromNapiValues, IntoNapiValue};
 use node_api::error::*;
-use node_api::{create_function, get_named_property, set_named_property, create_object,
-               create_external};
+use node_api::{
+    create_function,
+    get_named_property,
+    set_named_property,
+    create_object,
+    create_external
+};
 
 use futures::future;
 use futures::Future;
@@ -17,27 +22,25 @@ use tokio_core::reactor::Core;
 napi_module!("tests", register);
 
 #[no_mangle]
-pub extern "C" fn register(env: NapiEnv,
-                           exports: NapiValue,
-                           module: NapiValue,
-                           _priv: *mut std::os::raw::c_void) {
-    // create_and_attach_event_loop(env, module);
+pub unsafe extern "C" fn register(env: NapiEnv, exports: NapiValue) -> usize {
+    // create_and_attach_event_loop(env, exports);
 
-    register_test(env, "returns_objects", exports, &returns_objects);
-    register_test(env, "returns_strings", exports, &returns_strings);
-    register_test(env, "returns_numbers", exports, &returns_numbers);
-    register_test(env, "returns_booleans", exports, &returns_booleans);
-    register_test(env, "returns_arrays", exports, &returns_arrays);
+    register_test(env, "returns_objects",   &returns_objects);
+    register_test(env, "returns_strings",   &returns_strings);
+    register_test(env, "returns_numbers",   &returns_numbers);
+    register_test(env, "returns_booleans",  &returns_booleans);
+    register_test(env, "returns_arrays",    &returns_arrays);
 
-    register_test(env, "receives_objects", exports, &receives_objects);
-    register_test(env, "receives_strings", exports, &receives_strings);
-    register_test(env, "receives_booleans", exports, &receives_booleans);
-    register_test(env, "receives_f64", exports, &receives_f64);
-    register_test(env, "receives_u64", exports, &receives_u64);
-    register_test(env, "receives_i64", exports, &receives_i64);
-    register_test(env, "receives_arrays", exports, &receives_arrays);
+    register_test(env, "receives_objects",  &receives_objects);
+    register_test(env, "receives_strings",  &receives_strings);
+    register_test(env, "receives_booleans", &receives_booleans);
+    register_test(env, "receives_f64",      &receives_f64);
+    register_test(env, "receives_i64",      &receives_i64);
+    register_test(env, "receives_arrays",   &receives_arrays);
 
-    register_test(env, "returns_promises", exports, &returns_promises);
+    register_test(env, "returns_promises",  &returns_promises);
+
+    exports
 }
 
 // fn create_and_attach_event_loop(env: NapiEnv, module: NapiValue) {
@@ -45,12 +48,13 @@ pub extern "C" fn register(env: NapiEnv,
 //    let core_js = node_api::create_external(env, core).unwrap();
 //}
 
-fn register_test<F, A, R>(env: NapiEnv, name: &str, exports: NapiValue, f: F)
+fn register_test<F, A, R>(env: NapiEnv, name: &str, f: F)
     where F: Fn(NapiEnv, NapiValue, A) -> R,
           A: FromNapiValues,
           R: IntoNapiValue
 {
     let test = create_function(env, name, f).unwrap();
+    let exports = create_object(env).unwrap();
     set_named_property(env, exports, name, test).unwrap();
 }
 
@@ -65,7 +69,7 @@ fn returns_objects(_: NapiEnv, _: NapiValue, _: ()) -> Object {
 #[derive(Debug)]
 struct Object {
     pub foo: String,
-    pub bar: u64,
+    pub bar: i64,
 }
 
 impl IntoNapiValue for Object {
@@ -124,8 +128,8 @@ fn returns_strings(_: NapiEnv, _: NapiValue, _: ()) -> String {
     "returned_string".to_string()
 }
 
-fn returns_numbers(_: NapiEnv, _: NapiValue, _: ()) -> u64 {
-    42
+fn returns_numbers(_: NapiEnv, _: NapiValue, _: ()) -> f64 {
+    42.1337
 }
 
 fn returns_booleans(_: NapiEnv, _: NapiValue, _: ()) -> bool {
@@ -149,10 +153,6 @@ fn receives_booleans(_: NapiEnv, _: NapiValue, arg: bool) -> bool {
 }
 
 fn receives_f64(_: NapiEnv, _: NapiValue, arg: f64) -> f64 {
-    arg
-}
-
-fn receives_u64(_: NapiEnv, _: NapiValue, arg: u64) -> u64 {
     arg
 }
 

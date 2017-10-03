@@ -23,22 +23,20 @@ extern "C" {}
 #[cfg_attr(target_os = "macos", link_section = "__DATA,__mod_init_func")]
 #[cfg_attr(target_os = "windows", link_section = ".CRT$XCU")]
 pub static REGISTER_FOO: extern "C" fn() = {
-    extern "C" fn __load_napi_module() {
-        node_api::module_register(node_api::NapiModule {
-                            version: NAPI_MODULE_VERSION,
-                            flags: 0,
-                            filename: $module.to_string(),
-                            register_func: Some($register_func),
-                            modname: $module.to_string(),
-                        })
+    extern "C"
+        fn __load_napi_module() {
+            let napi_mod = node_api::NapiModule {
+                version: NAPI_MODULE_VERSION,
+                flags: 0,
+                filename: $module.to_string(),
+                register_func: Some($register_func),
+                modname: $module.to_string(),
+            };
+            node_api::module_register(napi_mod)
                 .expect("error registering module");
-    }
+        }
     __load_napi_module
 };
+
 }}
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
-}

@@ -9,7 +9,7 @@ use node_api::{create_function, set_named_property, create_object};
 use node_api::error::*;
 
 #[no_mangle]
-pub extern "C" fn register(env: NapiEnv, exports: NapiValue, _module: NapiValue, _priv: *mut std::os::raw::c_void) {
+pub extern "C" fn register(env: NapiEnv, exports: NapiValue) -> NapiValue {
     let function = create_function(env, "foo", |_: NapiEnv, _: NapiValue, ()| {
         HelloReturn {
             foo: "hello".to_string(),
@@ -18,6 +18,8 @@ pub extern "C" fn register(env: NapiEnv, exports: NapiValue, _module: NapiValue,
     })
             .expect("error creating function");
     set_named_property(env, exports, "hello", function).expect("error attaching function");
+
+    exports
 }
 
 struct HelloArgs {}
@@ -29,7 +31,7 @@ impl FromNapiValues for HelloArgs {
 
 struct HelloReturn {
     pub foo: String,
-    pub bar: u64,
+    pub bar: i64,
 }
 
 impl IntoNapiValue for HelloReturn {

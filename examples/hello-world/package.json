@@ -8,8 +8,8 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "cargo build",
-    "postinstall": "mkdir -p node-api && (cp ./target/debug/libhello_world.dylib node-api/index.node || cp ./target/debug/libhello_world.so node-api/index.node || cp ./target/debug/libhello_world.dll node-api/index.node)",
+    "postinstall": "mkdir -p node-api && (cp ../../target/debug/libhello_world.dylib node-api/index.node || cp ../../target/debug/libhello_world.so node-api/index.node || cp ../../target/debug/libhello_world.dll node-api/index.node)",
     "prestart": "npm install",
-    "start": "node --napi-modules index.js"
+    "start": "node index.js"
   }
 }

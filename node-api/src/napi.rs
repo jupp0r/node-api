@@ -149,13 +149,23 @@ pub fn array_with_length(env: NapiEnv, size: usize) -> Result<NapiValue> {
     }
 }
 
-pub fn create_number(env: NapiEnv, value: f64) -> Result<NapiValue> {
+macro_rules! create_number {
+    ($name:ident, $sys_name:ident, $value_type:ty) => {
+pub fn $name(env: NapiEnv, value: $value_type) -> Result<NapiValue> {
     unsafe {
         let mut napi_val: NapiValue = mem::uninitialized();
-        let status = napi_create_number(env, value, &mut napi_val);
+        let status = $sys_name(env, value, &mut napi_val);
         napi_either(env, status, napi_val)
     }
 }
+    };
+}
+
+create_number!(create_double, napi_create_double, f64);
+create_number!(create_i32,    napi_create_int32,  i32);
+create_number!(create_u32,    napi_create_uint32, u32);
+create_number!(create_i64,    napi_create_int64,  i64);
+
 
 pub fn create_string_utf8<T>(env: NapiEnv, val: T) -> Result<NapiValue>
     where T: AsRef<str>
@@ -215,6 +225,7 @@ pub fn create_function<F, T, R>(env: NapiEnv, utf8name: &str, f: F) -> Result<Na
     let status = unsafe {
         napi_create_function(env,
                              name.into_raw(),
+                             utf8name.len(),
                              Some(wrapper::<F, T, R>),
                              user_data,
                              &mut napi_val)
