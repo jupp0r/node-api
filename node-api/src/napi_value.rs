@@ -28,11 +28,11 @@ macro_rules! impl_from_napi_values {
     }
 }
 
-impl_from_napi_values!(String, NapiValueType::String, napi::get_value_string_utf8);
-impl_from_napi_values!(i64, NapiValueType::Number, napi::get_value_int64);
-impl_from_napi_values!(u64, NapiValueType::Number, get_value_uint64);
-impl_from_napi_values!(bool, NapiValueType::Boolean, napi::get_value_bool);
-impl_from_napi_values!(f64, NapiValueType::Number, napi::get_value_double);
+impl_from_napi_values!(String, NapiValueType::String,  napi::get_value_string_utf8);
+impl_from_napi_values!(i64,    NapiValueType::Number,  napi::get_value_int64);
+impl_from_napi_values!(u64,    NapiValueType::Number,  get_value_uint64);
+impl_from_napi_values!(bool,   NapiValueType::Boolean, napi::get_value_bool);
+impl_from_napi_values!(f64,    NapiValueType::Number,  napi::get_value_double);
 
 
 fn get_value_uint64(env: napi::NapiEnv, value: napi::NapiValue) -> Result<u64> {
@@ -117,18 +117,17 @@ impl<'a> IntoNapiValue for &'a str {
     }
 }
 
-impl_into_napi_values!(u8, |env, s| napi::create_number(env, s as f64));
-impl_into_napi_values!(u16, |env, s| napi::create_number(env, s as f64));
-impl_into_napi_values!(u32, |env, s| napi::create_number(env, s as f64));
-impl_into_napi_values!(u64, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(u8,  |env, s| napi::create_u32(env, s as u32));
+impl_into_napi_values!(u16, |env, s| napi::create_u32(env, s as u32));
+impl_into_napi_values!(u32, |env, s| napi::create_u32(env, s as u32));
 
-impl_into_napi_values!(i8, |env, s| napi::create_number(env, s as f64));
-impl_into_napi_values!(i16, |env, s| napi::create_number(env, s as f64));
-impl_into_napi_values!(i32, |env, s| napi::create_number(env, s as f64));
-impl_into_napi_values!(i64, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(i8,  |env, s| napi::create_i64(env, s as i64));
+impl_into_napi_values!(i16, |env, s| napi::create_i64(env, s as i64));
+impl_into_napi_values!(i32, |env, s| napi::create_i64(env, s as i64));
+impl_into_napi_values!(i64, |env, s| napi::create_i64(env, s as i64));
 
-impl_into_napi_values!(f32, |env, s| napi::create_number(env, s as f64));
-impl_into_napi_values!(f64, |env, s| napi::create_number(env, s as f64));
+impl_into_napi_values!(f32, |env, s| napi::create_double(env, s as f64));
+impl_into_napi_values!(f64, |env, s| napi::create_double(env, s));
 
 impl_into_napi_values!(bool,  napi::get_boolean);
 
@@ -180,7 +179,7 @@ impl<T, E> IntoNapiValue for future::BoxFuture<T, E>
                     Ok(val) => (then_args.on_fulfilled)(env, this, val),
                     Err(err) => (then_args.on_rejected)(env, this, err)
                 }
-                future::result::<(),()>(Ok(())).boxed()
+                Box::new(future::result::<(),()>(Ok(())))
             }).boxed().wait().unwrap();
         })?;
         napi::set_named_property(env, obj, "then", then)?;

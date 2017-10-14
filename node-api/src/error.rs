@@ -75,7 +75,6 @@ impl From<napi_status> for NapiErrorType {
             napi_status::napi_generic_failure => NapiErrorType::GenericFailure,
             napi_status::napi_pending_exception => NapiErrorType::PendingException,
             napi_status::napi_cancelled => NapiErrorType::Cancelled,
-            napi_status::napi_status_last => NapiErrorType::StatusLast,
             _ => NapiErrorType::GenericFailure,
         }
     }

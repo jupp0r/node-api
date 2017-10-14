@@ -7,4 +7,4 @@ authors = ["Jupp Müller <jupp0r@gmail.com>"]
 crate-type = ["cdylib"]
 
 [dependencies]
-node-api = { path = "../.." }
+node-api = { path = "../../node-api" }
